@@ -62,10 +62,14 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       const cityName = await reverseGeocode(coords.latitude, coords.longitude)
       await loadFromCoords(coords.latitude, coords.longitude, cityName)
     } catch (e) {
-      if (isLocationDenied(e)) {
+      // Any geolocation problem (denied, timeout, unavailable, unsupported)
+      // should let the user type a location instead of dead-ending.
+      if (e instanceof GeolocationPositionError || isLocationDenied(e)) {
+        if (isLocationDenied(e)) setError('')
+        else setError("Couldn't get your location automatically — enter it below.")
         setStatus('needs_address')
       } else {
-        setError((e as Error).message ?? 'Something went wrong')
+        setError((e as Error).message || 'Something went wrong fetching the weather.')
         setStatus('error')
       }
     }
@@ -269,10 +273,18 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
         {status === 'error' && (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
             <span className="text-4xl">😬</span>
-            <p className="text-zinc-400">{error}</p>
-            <button onClick={load} className="rounded-2xl bg-emerald-500 px-6 py-3 text-white font-medium hover:bg-emerald-400 transition-all">
-              Try again
-            </button>
+            <p className="text-zinc-400">{error || 'Something went wrong.'}</p>
+            <div className="flex flex-col gap-2 w-full max-w-xs">
+              <button onClick={load} className="rounded-2xl bg-emerald-500 px-6 py-3 text-white font-medium hover:bg-emerald-400 transition-all">
+                Try again
+              </button>
+              <button
+                onClick={() => { setError(''); setStatus('needs_address') }}
+                className="rounded-2xl bg-zinc-800 px-6 py-3 text-zinc-300 font-medium hover:bg-zinc-700 transition-all"
+              >
+                Enter a location instead
+              </button>
+            </div>
           </div>
         )}
 
