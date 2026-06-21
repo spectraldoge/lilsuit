@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { UserProfile, Gender } from '../types'
+import type { UserProfile, Gender, CustomKitItem } from '../types'
 import { saveProfile } from '../store/profileStore'
 
 interface Props {
@@ -15,18 +15,59 @@ const kitItems = [
   { key: 'hasThermalBibs',  label: 'Thermal bibs',    emoji: '🩲' },
   { key: 'hasLightJacket',  label: 'Light jacket',    emoji: '🧥' },
   { key: 'hasWinterJacket', label: 'Winter jacket',   emoji: '❄️' },
-  { key: 'hasBaseLayer',    label: 'Base layer',      emoji: '👕' },
+  { key: 'hasBaseLayer',    label: 'Base layer',       emoji: '👕' },
   { key: 'hasLightGloves',  label: 'Light gloves',    emoji: '🤲' },
   { key: 'hasWinterGloves', label: 'Winter gloves',   emoji: '🧤' },
-  { key: 'hasOvershoes',    label: 'Overshoes',       emoji: '🥾' },
-  { key: 'hasSkullCap',     label: 'Skull cap',       emoji: '🪖' },
+  { key: 'hasOvershoes',    label: 'Overshoes',        emoji: '🥾' },
+  { key: 'hasSkullCap',     label: 'Skull cap',        emoji: '🪖' },
 ]
 
+const categoryOptions: { value: CustomKitItem['category']; label: string }[] = [
+  { value: 'top',   label: 'Top / jacket' },
+  { value: 'legs',  label: 'Legs' },
+  { value: 'hands', label: 'Hands' },
+  { value: 'head',  label: 'Head' },
+  { value: 'feet',  label: 'Feet' },
+  { value: 'extra', label: 'Other' },
+]
+
+const tempThresholds = [
+  { label: 'Below 0°C (freezing)', value: 0 },
+  { label: 'Below 5°C (very cold)', value: 5 },
+  { label: 'Below 10°C (cold)', value: 10 },
+  { label: 'Below 15°C (cool)', value: 15 },
+  { label: 'Below 20°C (mild)', value: 20 },
+  { label: 'Always wear it', value: 99 },
+]
+
+const blankItem = (): Omit<CustomKitItem, 'id'> => ({
+  name: '',
+  category: 'top',
+  wearBelowC: 10,
+})
+
 export default function SettingsScreen({ profile, onSave, onBack }: Props) {
-  const [draft, setDraft] = useState<UserProfile>({ ...profile })
+  const [draft, setDraft] = useState<UserProfile>({
+    ...profile,
+    customItems: profile.customItems ?? [],
+  })
+  const [addingItem, setAddingItem] = useState(false)
+  const [newItem, setNewItem] = useState(blankItem())
 
   function set<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
     setDraft(p => ({ ...p, [key]: value }))
+  }
+
+  function addCustomItem() {
+    if (!newItem.name.trim()) return
+    const item: CustomKitItem = { ...newItem, id: crypto.randomUUID() }
+    setDraft(p => ({ ...p, customItems: [...p.customItems, item] }))
+    setNewItem(blankItem())
+    setAddingItem(false)
+  }
+
+  function removeCustomItem(id: string) {
+    setDraft(p => ({ ...p, customItems: p.customItems.filter(i => i.id !== id) }))
   }
 
   function save() {
@@ -50,17 +91,6 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
       </div>
 
       <div className="flex flex-col gap-6 px-6">
-        {/* Name */}
-        <section className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Name</label>
-          <input
-            type="text"
-            value={draft.name}
-            onChange={e => set('name', e.target.value)}
-            className="rounded-2xl bg-zinc-800 px-5 py-4 text-white outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </section>
-
         {/* Gender */}
         <section className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Gender</label>
@@ -118,7 +148,7 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
           </div>
         </section>
 
-        {/* Kit */}
+        {/* Preset kit */}
         <section className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">My kit</label>
           <div className="grid grid-cols-2 gap-2">
@@ -137,6 +167,92 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* Custom kit */}
+        <section className="flex flex-col gap-3">
+          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Custom kit</label>
+
+          {draft.customItems.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {draft.customItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between rounded-2xl bg-zinc-800 px-4 py-3">
+                  <div>
+                    <div className="text-white text-sm font-medium">{item.name}</div>
+                    <div className="text-zinc-500 text-xs mt-0.5">
+                      {categoryOptions.find(c => c.value === item.category)?.label} ·{' '}
+                      {tempThresholds.find(t => t.value === item.wearBelowC)?.label ?? `Below ${item.wearBelowC}°C`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeCustomItem(item.id)}
+                    className="text-zinc-500 hover:text-red-400 transition-all pl-4"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {addingItem ? (
+            <div className="flex flex-col gap-3 rounded-2xl bg-zinc-900 p-4">
+              <input
+                type="text"
+                placeholder="Item name (e.g. Neck gaiter)"
+                value={newItem.name}
+                onChange={e => setNewItem(i => ({ ...i, name: e.target.value }))}
+                autoFocus
+                className="rounded-xl bg-zinc-800 px-4 py-3 text-white text-sm placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <select
+                value={newItem.category}
+                onChange={e => setNewItem(i => ({ ...i, category: e.target.value as CustomKitItem['category'] }))}
+                className="rounded-xl bg-zinc-800 px-4 py-3 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {categoryOptions.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <select
+                value={newItem.wearBelowC}
+                onChange={e => setNewItem(i => ({ ...i, wearBelowC: Number(e.target.value) }))}
+                className="rounded-xl bg-zinc-800 px-4 py-3 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {tempThresholds.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAddingItem(false)}
+                  className="flex-1 rounded-xl bg-zinc-800 py-3 text-zinc-400 text-sm font-medium hover:bg-zinc-700 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addCustomItem}
+                  disabled={!newItem.name.trim()}
+                  className={`flex-1 rounded-xl py-3 text-sm font-medium transition-all ${
+                    newItem.name.trim()
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                      : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingItem(true)}
+              className="rounded-2xl border border-dashed border-zinc-700 py-3 text-zinc-400 text-sm hover:border-emerald-500 hover:text-emerald-500 transition-all"
+            >
+              + Add custom item
+            </button>
+          )}
         </section>
 
         {/* Save */}

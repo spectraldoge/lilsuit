@@ -19,16 +19,22 @@ export const defaultProfile: UserProfile = {
   hasSkullCap: true,
   runsHot: false,
   runsCold: false,
+  customItems: [],
 }
 
+// Migrate saved profiles that predate customItems
 export function loadProfile(): UserProfile | null {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed.customItems) parsed.customItems = []
+    return parsed
   } catch {
     return null
   }
 }
+
 
 export function saveProfile(profile: UserProfile): void {
   localStorage.setItem(KEY, JSON.stringify(profile))

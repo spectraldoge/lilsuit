@@ -141,6 +141,16 @@ export function getRecommendation(
       items.push({ category: 'feet', name: 'Overshoes (optional)', emoji: '🥾' })
   }
 
+  // ── Custom kit ────────────────────────────────────────────────────────────
+  for (const item of profile.customItems) {
+    if (effective < item.wearBelowC) {
+      const categoryEmojis: Record<string, string> = {
+        top: '👕', legs: '🦵', hands: '🧤', head: '🪖', feet: '🥾', extra: '🎽',
+      }
+      items.push({ category: item.category, name: item.name, emoji: categoryEmojis[item.category] ?? '🎽' })
+    }
+  }
+
   // ── Rain notes ────────────────────────────────────────────────────────────
   if (weather.isRaining) {
     notes.push('Rain expected — waterproof jacket recommended')

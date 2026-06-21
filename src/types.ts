@@ -19,6 +19,15 @@ export interface UserProfile {
   // personal running temp
   runsHot: boolean  // feels warmer than average
   runsCold: boolean // feels cooler than average
+  // user-defined kit
+  customItems: CustomKitItem[]
+}
+
+export interface CustomKitItem {
+  id: string
+  name: string
+  category: 'top' | 'legs' | 'hands' | 'head' | 'feet' | 'extra'
+  wearBelowC: number  // include in recommendation when effective temp is below this
 }
 
 export interface WeatherData {
