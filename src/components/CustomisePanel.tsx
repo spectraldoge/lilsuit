@@ -1,24 +1,39 @@
-import type { RideOptions } from '../types'
+import type { RideOptions, Activity } from '../types'
 
 interface Props {
   options: RideOptions
+  activity: Activity
   onChange: (options: RideOptions) => void
   onClose: () => void
 }
 
 type OptionItem<T extends string> = { value: T; label: string; sub: string }
 
-const intensityOptions: OptionItem<RideOptions['intensity']>[] = [
-  { value: 'easy',     label: '🐢 Easy',     sub: 'Recovery spin or café ride' },
-  { value: 'moderate', label: '🚴 Moderate',  sub: 'Steady endurance pace' },
-  { value: 'hard',     label: '🔥 Hard',      sub: 'Intervals, racing, or big efforts' },
-]
+const intensityByActivity: Record<Activity, OptionItem<RideOptions['intensity']>[]> = {
+  cycling: [
+    { value: 'easy',     label: '🐢 Easy',     sub: 'Recovery spin or café ride' },
+    { value: 'moderate', label: '🚴 Moderate', sub: 'Steady endurance pace' },
+    { value: 'hard',     label: '🔥 Hard',     sub: 'Intervals, racing, or big efforts' },
+  ],
+  running: [
+    { value: 'easy',     label: '🐢 Easy',     sub: 'Easy recovery jog' },
+    { value: 'moderate', label: '🏃 Moderate', sub: 'Steady run' },
+    { value: 'hard',     label: '🔥 Hard',     sub: 'Tempo, intervals, or racing' },
+  ],
+}
 
-const durationOptions: OptionItem<RideOptions['duration']>[] = [
-  { value: 'short',  label: '⚡ Short',   sub: 'Under an hour' },
-  { value: 'medium', label: '🕐 Medium',  sub: '1–3 hours' },
-  { value: 'long',   label: '🌄 Long',    sub: '3+ hours' },
-]
+const durationByActivity: Record<Activity, OptionItem<RideOptions['duration']>[]> = {
+  cycling: [
+    { value: 'short',  label: '⚡ Short',   sub: 'Under an hour' },
+    { value: 'medium', label: '🕐 Medium',  sub: '1–3 hours' },
+    { value: 'long',   label: '🌄 Long',    sub: '3+ hours' },
+  ],
+  running: [
+    { value: 'short',  label: '⚡ Short',   sub: 'Under 30 min' },
+    { value: 'medium', label: '🕐 Medium',  sub: '30–75 min' },
+    { value: 'long',   label: '🌄 Long',    sub: 'Over 75 min' },
+  ],
+}
 
 const timeOptions: OptionItem<RideOptions['timeOfDay']>[] = [
   { value: 'morning',   label: '🌅 Morning',   sub: 'Before 10am — coldest part of the day' },
@@ -78,10 +93,13 @@ function daysAhead(iso: string): number {
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
 }
 
-export default function CustomisePanel({ options, onChange, onClose }: Props) {
+export default function CustomisePanel({ options, activity, onChange, onClose }: Props) {
   function set<K extends keyof RideOptions>(key: K, value: RideOptions[K]) {
     onChange({ ...options, [key]: value })
   }
+
+  const intensityOptions = intensityByActivity[activity]
+  const durationOptions = durationByActivity[activity]
 
   const now = new Date()
   const max = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000) // ~16-day forecast limit

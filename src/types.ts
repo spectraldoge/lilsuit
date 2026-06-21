@@ -1,4 +1,5 @@
 export type Gender = 'male' | 'female' | 'other'
+export type Activity = 'cycling' | 'running'
 
 export interface CustomKitItem {
   id: string
@@ -27,6 +28,18 @@ export interface UserProfile {
   runsCold: boolean
   customItems: CustomKitItem[]
   units: Units
+  // running-specific kit (shorts & t-shirt assumed universal, so not gated)
+  runLongSleeve: boolean
+  runBaseLayer: boolean
+  runJacket: boolean      // windproof / rain running jacket
+  runVest: boolean        // running gilet / vest
+  runLongTights: boolean
+  runCapris: boolean      // three-quarter / capri tights
+  runGloves: boolean
+  runBeanie: boolean
+  runHeadband: boolean
+  runCap: boolean         // peaked cap (sun / rain)
+  runBuff: boolean        // neck gaiter / buff
 }
 
 export interface SavedLocation {
@@ -87,4 +100,5 @@ export interface RideResult {
   feedback: FeedbackValue
   wore?: string         // optional free-text note of what they wore
   source: 'in_app' | 'manual'
+  activity: Activity
 }

@@ -11,7 +11,7 @@ interface Props {
   onBack: () => void
 }
 
-const presetKitItems = [
+const cyclingKitItems = [
   { key: 'hasGilet',        label: 'Gilet',           emoji: '🦺' },
   { key: 'hasArmWarmers',   label: 'Arm warmers',     emoji: '💪' },
   { key: 'hasLegWarmers',   label: 'Leg warmers',     emoji: '🦵' },
@@ -24,6 +24,20 @@ const presetKitItems = [
   { key: 'hasWinterGloves', label: 'Winter gloves',   emoji: '🧤' },
   { key: 'hasOvershoes',    label: 'Overshoes',       emoji: '🥾' },
   { key: 'hasSkullCap',     label: 'Skull cap',       emoji: '🪖' },
+]
+
+const runningKitItems = [
+  { key: 'runLongSleeve', label: 'Long-sleeve top', emoji: '👕' },
+  { key: 'runBaseLayer',  label: 'Base layer',      emoji: '👕' },
+  { key: 'runJacket',     label: 'Running jacket',  emoji: '🧥' },
+  { key: 'runVest',       label: 'Vest / gilet',    emoji: '🦺' },
+  { key: 'runLongTights', label: 'Long tights',     emoji: '🦵' },
+  { key: 'runCapris',     label: 'Capri tights',    emoji: '🦵' },
+  { key: 'runGloves',     label: 'Gloves',          emoji: '🧤' },
+  { key: 'runBeanie',     label: 'Beanie',          emoji: '🧢' },
+  { key: 'runHeadband',   label: 'Headband',        emoji: '🎽' },
+  { key: 'runCap',        label: 'Peaked cap',      emoji: '🧢' },
+  { key: 'runBuff',       label: 'Buff / gaiter',   emoji: '🧣' },
 ]
 
 const categoryOptions: { value: CustomKitItem['category']; label: string }[] = [
@@ -154,11 +168,31 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
           </div>
         </section>
 
-        {/* Preset kit */}
+        {/* Cycling kit */}
         <section className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">My kit</label>
+          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">🚴 Cycling kit</label>
           <div className="grid grid-cols-2 gap-2">
-            {presetKitItems.map(item => (
+            {cyclingKitItems.map(item => (
+              <button key={item.key}
+                onClick={() => set(item.key as keyof UserProfile, !(draft[item.key as keyof UserProfile]) as any)}
+                className={`rounded-2xl p-3 text-left text-sm transition-all ${
+                  draft[item.key as keyof UserProfile]
+                    ? 'bg-emerald-500/20 ring-2 ring-emerald-500 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}>
+                <span className="text-lg">{item.emoji}</span>
+                <div className="mt-1 font-medium leading-tight">{item.label}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Running kit */}
+        <section className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">🏃 Running kit</label>
+          <p className="text-xs text-zinc-600 -mt-1">Shorts and a t-shirt are assumed — just tell us the extras you own.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {runningKitItems.map(item => (
               <button key={item.key}
                 onClick={() => set(item.key as keyof UserProfile, !(draft[item.key as keyof UserProfile]) as any)}
                 className={`rounded-2xl p-3 text-left text-sm transition-all ${
@@ -263,7 +297,7 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
                 <div key={ride.id} className="flex items-center justify-between rounded-2xl bg-zinc-800 px-4 py-3">
                   <div>
                     <div className="text-white text-sm font-medium">
-                      {showTemp(ride.tempC)} · {feedbackLabel[ride.feedback]}
+                      {ride.activity === 'running' ? '🏃' : '🚴'} {showTemp(ride.tempC)} · {feedbackLabel[ride.feedback]}
                     </div>
                     <div className="text-zinc-500 text-xs mt-0.5">
                       {new Date(ride.date).toLocaleDateString([], { day: 'numeric', month: 'short' })}

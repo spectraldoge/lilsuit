@@ -1,4 +1,4 @@
-import type { RideResult, FeedbackValue } from '../types'
+import type { RideResult, FeedbackValue, Activity } from '../types'
 
 const KEY = 'lilsuit_ride_history'
 const MAX = 50
@@ -16,6 +16,7 @@ export function loadHistory(): RideResult[] {
       feedback: r.feedback,
       wore: r.wore,
       source: r.source ?? 'in_app',
+      activity: r.activity ?? 'cycling',
     }))
   } catch {
     return []
@@ -29,7 +30,7 @@ function persist(history: RideResult[]): void {
 export function saveRide(
   tempC: number,
   feedback: FeedbackValue,
-  opts: { wore?: string; source?: RideResult['source']; date?: string } = {}
+  opts: { wore?: string; source?: RideResult['source']; date?: string; activity?: Activity } = {}
 ): void {
   const history = loadHistory()
   const result: RideResult = {
@@ -39,6 +40,7 @@ export function saveRide(
     feedback,
     wore: opts.wore?.trim() || undefined,
     source: opts.source ?? 'in_app',
+    activity: opts.activity ?? 'cycling',
   }
   persist([result, ...history])
 }
@@ -61,10 +63,10 @@ function biasFromResults(results: RideResult[]): number {
   return 0
 }
 
-// Temperature-band aware: prefer feedback from rides near `aroundTempC`,
-// fall back to all recent rides if there isn't enough nearby data.
-export function getTemperatureBias(aroundTempC: number): number {
-  const history = loadHistory()
+// Temperature-band aware and per-activity: prefer feedback from rides of the
+// same activity near `aroundTempC`, falling back to all that activity's rides.
+export function getTemperatureBias(aroundTempC: number, activity: Activity): number {
+  const history = loadHistory().filter(r => r.activity === activity)
   const nearby = history.filter(r => Math.abs(r.tempC - aroundTempC) <= 5)
 
   if (nearby.length >= 3) return biasFromResults(nearby.slice(0, 10))

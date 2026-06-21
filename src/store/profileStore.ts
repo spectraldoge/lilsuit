@@ -22,6 +22,32 @@ export const defaultProfile: UserProfile = {
   runsCold: false,
   customItems: [],
   units: 'metric',
+  // running kit defaults
+  runLongSleeve: true,
+  runBaseLayer: false,
+  runJacket: true,
+  runVest: false,
+  runLongTights: true,
+  runCapris: false,
+  runGloves: true,
+  runBeanie: true,
+  runHeadband: false,
+  runCap: true,
+  runBuff: false,
+}
+
+const RUN_KIT_DEFAULTS = {
+  runLongSleeve: true,
+  runBaseLayer: false,
+  runJacket: true,
+  runVest: false,
+  runLongTights: true,
+  runCapris: false,
+  runGloves: true,
+  runBeanie: true,
+  runHeadband: false,
+  runCap: true,
+  runBuff: false,
 }
 
 export function loadProfile(): UserProfile | null {
@@ -33,6 +59,8 @@ export function loadProfile(): UserProfile | null {
     if (!parsed.customItems) parsed.customItems = []
     if (parsed.hasRainJacket === undefined) parsed.hasRainJacket = false
     if (!parsed.units) parsed.units = 'metric'
+    // backfill running kit for profiles created before running mode existed
+    if (parsed.runLongTights === undefined) Object.assign(parsed, RUN_KIT_DEFAULTS)
     return parsed
   } catch {
     return null

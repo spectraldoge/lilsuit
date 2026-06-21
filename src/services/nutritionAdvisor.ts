@@ -1,4 +1,4 @@
-import type { WeatherData, RideOptions } from '../types'
+import type { WeatherData, RideOptions, Activity } from '../types'
 
 export interface NutritionAdvice {
   hydration: string
@@ -36,32 +36,61 @@ const hydrationMatrix: Record<RideOptions['duration'], Record<TempBand, string>>
   },
 }
 
-export function getNutrition(weather: WeatherData, ride: RideOptions): NutritionAdvice {
+// Runners carry less, so the hydration language is different
+const runHydrationMatrix: Record<RideOptions['duration'], Record<TempBand, string>> = {
+  short: {
+    cold: "You won't need to carry water.",
+    mild: 'No need to carry water for a short run.',
+    warm: 'A small handheld bottle is plenty.',
+    hot:  'Carry a handheld bottle even for a short run.',
+  },
+  medium: {
+    cold: 'You can probably skip carrying water.',
+    mild: 'Carry a small bottle or plan a water stop.',
+    warm: 'Carry a handheld bottle and sip regularly.',
+    hot:  'Carry water and plan a route past fountains.',
+  },
+  long: {
+    cold: 'Carry a bottle — easy to under-drink when it\'s cold.',
+    mild: 'Carry a handheld or plan water stops every few km.',
+    warm: 'Carry a hydration vest or bottle and refill when you can.',
+    hot:  "Carry a hydration vest, drink often, and plan refills — don't run dry.",
+  },
+}
+
+export function getNutrition(weather: WeatherData, ride: RideOptions, activity: Activity = 'cycling'): NutritionAdvice {
   const band = tempBand(weather.feelsLikeC)
   const notes: string[] = []
 
-  const hydration = hydrationMatrix[ride.duration][band]
+  const hydration = (activity === 'running' ? runHydrationMatrix : hydrationMatrix)[ride.duration][band]
 
   // ── Fuel ──────────────────────────────────────────────────────────────────
   let fuel: string | null = null
-  if (ride.duration === 'short') {
-    if (ride.intensity === 'hard')
-      fuel = 'Pop a gel in your pocket in case you go deep — otherwise no food needed.'
-  } else if (ride.duration === 'medium') {
-    fuel = 'Pack a couple of energy bars or gels — aim for something every 45 minutes.'
+  if (activity === 'running') {
+    if (ride.duration === 'long')
+      fuel = 'Take a gel or some chews every 30–45 minutes to keep your energy up.'
+    else if (ride.duration === 'medium' && ride.intensity === 'hard')
+      fuel = 'A gel partway round will help if you\'re pushing the pace.'
   } else {
-    fuel = 'Bring real food and aim for 60–90g of carbs per hour: bars, gels, a banana, or a sandwich.'
+    if (ride.duration === 'short') {
+      if (ride.intensity === 'hard')
+        fuel = 'Pop a gel in your pocket in case you go deep — otherwise no food needed.'
+    } else if (ride.duration === 'medium') {
+      fuel = 'Pack a couple of energy bars or gels — aim for something every 45 minutes.'
+    } else {
+      fuel = 'Bring real food and aim for 60–90g of carbs per hour: bars, gels, a banana, or a sandwich.'
+    }
   }
 
   // ── Electrolytes / heat ─────────────────────────────────────────────────────
   if (band === 'hot') {
-    notes.push('Add electrolyte tabs to at least one bottle to replace salts lost through sweat.')
+    notes.push('Replace salts lost through sweat — an electrolyte tab in your water helps.')
   } else if (band === 'warm' && ride.duration !== 'short') {
-    notes.push('Consider an electrolyte tab in one bottle — you\'ll be sweating more than it feels.')
+    notes.push("Consider an electrolyte tab — you'll be sweating more than it feels.")
   }
 
-  // ── Cold-weather reminder ───────────────────────────────────────────────────
-  if (band === 'cold' && ride.duration !== 'short') {
+  // ── Cold-weather reminder (cycling — runners drink less anyway) ──────────────
+  if (activity === 'cycling' && band === 'cold' && ride.duration !== 'short') {
     notes.push("It's easy to forget to drink in the cold — sip every 15 minutes even if you're not thirsty.")
   }
 

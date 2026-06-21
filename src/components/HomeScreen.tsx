@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, SavedLocation } from '../types'
+import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, SavedLocation, Activity } from '../types'
 import { defaultRideOptions } from '../types'
 import { fetchWeatherAt, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
 import { getRecommendation, buildShareText } from '../services/outfitAdvisor'
 import { getNutrition } from '../services/nutritionAdvisor'
 import { getTemperatureBias, saveRide } from '../store/rideHistoryStore'
 import { loadLocations, saveLocation } from '../store/locationStore'
+import { loadActivity, saveActivity } from '../store/activityStore'
 import CustomisePanel from './CustomisePanel'
 import FeedbackModal from './FeedbackModal'
 import LogRideModal from './LogRideModal'
@@ -35,12 +36,13 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
   const [locationSaved, setLocationSaved] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [activity, setActivity] = useState<Activity>(loadActivity())
 
   useEffect(() => { setSavedLocations(loadLocations()) }, [])
 
   const buildOutfit = useCallback((w: WeatherData, opts: RideOptions) => {
-    setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC)))
-  }, [profile])
+    setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC, activity), activity))
+  }, [profile, activity])
 
   const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
     setStatus('fetching')
@@ -108,14 +110,23 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       try {
         const w = await fetchWeatherAt(currentCoords.lat, currentCoords.lon, opts.dateTime)
         setWeather(w)
-        setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC)))
+        setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC, activity), activity))
       } catch (e) {
         setError((e as Error).message ?? 'Could not load that forecast')
       } finally {
         setUpdating(false)
       }
     } else if (weather) {
-      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias(weather.feelsLikeC)))
+      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias(weather.feelsLikeC, activity), activity))
+    }
+  }
+
+  function handleActivityChange(next: Activity) {
+    if (next === activity) return
+    setActivity(next)
+    saveActivity(next)
+    if (weather) {
+      setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC, next), next))
     }
   }
 
@@ -129,7 +140,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
   async function handleShare() {
     if (!outfit) return
-    const text = buildShareText(outfit)
+    const text = buildShareText(outfit, activity)
     if (navigator.share) {
       await navigator.share({ text })
     } else {
@@ -141,8 +152,8 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
   async function handleAddToReminders() {
     if (!outfit || !weather) return
-    const nutrition = getNutrition(weather, rideOptions)
-    const lines = ['🚴 lilsuit ride kit', '']
+    const nutrition = getNutrition(weather, rideOptions, activity)
+    const lines = [`${activity === 'running' ? '🏃' : '🚴'} lilsuit ${activity === 'running' ? 'run' : 'ride'} kit`, '']
     outfit.items.forEach(i => lines.push(`• ${i.name}`))
     lines.push('', `• 💧 ${nutrition.hydration}`)
     if (nutrition.fuel) lines.push(`• 🍌 ${nutrition.fuel}`)
@@ -150,7 +161,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'lilsuit ride kit', text })
+        await navigator.share({ title: `lilsuit ${activity === 'running' ? 'run' : 'ride'} kit`, text })
       } catch { /* user cancelled the share sheet */ }
     } else {
       await navigator.clipboard.writeText(text)
@@ -160,16 +171,16 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   }
 
   function handleFeedback(f: 'too_hot' | 'just_right' | 'too_cold') {
-    if (weather) saveRide(weather.feelsLikeC, f, { source: 'in_app' })
+    if (weather) saveRide(weather.feelsLikeC, f, { source: 'in_app', activity })
     setShowFeedback(false)
     setFeedbackDone(true)
   }
 
   function handleLogRide(tempC: number, f: 'too_hot' | 'just_right' | 'too_cold', wore: string) {
-    saveRide(tempC, f, { source: 'manual', wore })
+    saveRide(tempC, f, { source: 'manual', wore, activity })
     setShowLogRide(false)
     // Re-apply learning to the current recommendation immediately
-    if (weather) setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC)))
+    if (weather) setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC, activity), activity))
   }
 
   useEffect(() => { load() }, [load])
@@ -197,7 +208,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-14 pb-4">
         <span className="text-2xl font-bold tracking-tight text-white">
-          lilsuit <span className="text-emerald-500">🚴</span>
+          lilsuit <span className="text-emerald-500">{activity === 'running' ? '🏃' : '🚴'}</span>
         </span>
         <button
           onClick={onOpenSettings}
@@ -210,6 +221,23 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>
+      </div>
+
+      {/* Activity toggle */}
+      <div className="px-6 pb-2">
+        <div className="flex gap-1 rounded-2xl bg-zinc-900 p-1">
+          {([['cycling', '🚴 Cycling'], ['running', '🏃 Running']] as [Activity, string][]).map(([a, label]) => (
+            <button
+              key={a}
+              onClick={() => handleActivityChange(a)}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-all ${
+                activity === a ? 'bg-emerald-500 text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 px-6 flex flex-col gap-4">
@@ -226,7 +254,9 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
           <div className="flex flex-col justify-center flex-1 gap-5">
             <div className="text-center">
               <span className="text-4xl">📍</span>
-              <h2 className="text-xl font-semibold text-white mt-3">Where are you riding?</h2>
+              <h2 className="text-xl font-semibold text-white mt-3">
+                Where are you {activity === 'running' ? 'running' : 'riding'}?
+              </h2>
               <p className="text-zinc-400 text-sm mt-1">Enter a city, town, or postcode</p>
             </div>
 
@@ -374,7 +404,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
             {/* Nutrition */}
             {(() => {
-              const nutrition = getNutrition(weather, rideOptions)
+              const nutrition = getNutrition(weather, rideOptions, activity)
               return (
                 <div className="rounded-3xl bg-zinc-900 p-5 flex flex-col gap-3">
                   <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Fuel & hydration</h3>
@@ -492,6 +522,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       {showCustomise && (
         <CustomisePanel
           options={rideOptions}
+          activity={activity}
           onChange={handleRideOptionsChange}
           onClose={() => setShowCustomise(false)}
         />
