@@ -21,6 +21,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [locationLabel, setLocationLabel] = useState('')
   const [rideOptions, setRideOptions] = useState<RideOptions>(defaultRideOptions)
   const [showCustomise, setShowCustomise] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const buildOutfit = useCallback((w: WeatherData, opts: RideOptions) => {
     setOutfit(getRecommendation(w, profile, opts))
@@ -63,6 +64,24 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       setStatus('needs_address')
     }
   }, [address, loadFromCoords])
+
+  async function handleShare(outfit: OutfitRecommendation) {
+    const itemNames = outfit.items
+      .filter(i => i.category !== 'extra')
+      .map(i => i.name.toLowerCase())
+    const list = itemNames.length <= 2
+      ? itemNames.join(' and ')
+      : itemNames.slice(0, -1).join(', ') + ' and ' + itemNames.at(-1)
+    const text = `I'm wearing ${list}, thanks to lilsuit.netlify.app 🚴`
+
+    if (navigator.share) {
+      await navigator.share({ text })
+    } else {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   // Re-compute outfit whenever ride options change (no need to re-fetch weather)
   function handleRideOptionsChange(opts: RideOptions) {
@@ -220,6 +239,23 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
                 )}
               </div>
             )}
+
+            {/* Share */}
+            <button
+              onClick={() => handleShare(outfit)}
+              className="rounded-2xl bg-zinc-800 py-4 text-white text-sm font-medium hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+            >
+              {copied ? (
+                <>✓ Copied to clipboard</>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Share your kit
+                </>
+              )}
+            </button>
 
             {/* Action buttons */}
             <button
