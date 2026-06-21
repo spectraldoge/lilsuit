@@ -39,6 +39,10 @@ export function getRecommendation(
   ride: RideOptions,
   tempBias = 0
 ): OutfitRecommendation {
+  // When we have a real forecast for a specific hour, the temperature already
+  // reflects the time of day — so skip the manual morning/midday adjustment.
+  const todAdjustment = ride.dateTime ? 0 : timeOfDayAdjustment(ride.timeOfDay)
+
   const baseTemp = weather.feelsLikeC
   const windChill = weather.windKph > 30 ? -2 : weather.windKph > 15 ? -1 : 0
   const effective =
@@ -46,7 +50,7 @@ export function getRecommendation(
     windChill +
     intensityAdjustment(ride.intensity) +
     durationAdjustment(ride.duration) +
-    timeOfDayAdjustment(ride.timeOfDay) +
+    todAdjustment +
     tempBias -
     weightAdjustment(profile.weightKg) -
     personalAdjustment(profile)

@@ -60,6 +60,7 @@ export interface RideOptions {
   duration: Duration
   timeOfDay: TimeOfDay
   units: Units
+  dateTime: string | null  // ISO string for a future ride, null = ride now
 }
 
 export const defaultRideOptions: RideOptions = {
@@ -67,6 +68,7 @@ export const defaultRideOptions: RideOptions = {
   duration: 'medium',
   timeOfDay: 'morning',
   units: 'metric',
+  dateTime: null,
 }
 
 export interface OutfitRecommendation {

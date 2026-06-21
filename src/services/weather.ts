@@ -12,7 +12,7 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherDat
   const c = data.current
 
   const code: number = c.weather_code
-  const isRaining = [51,53,55,61,63,65,71,73,75,80,81,82,95,96,99].includes(code)
+  const isRaining = RAIN_CODES.includes(code)
 
   return {
     tempC: Math.round(c.temperature_2m),
@@ -21,6 +21,42 @@ export async function fetchWeather(lat: number, lon: number): Promise<WeatherDat
     precipMm: c.precipitation,
     description: weatherDescription(code),
     isRaining,
+  }
+}
+
+const RAIN_CODES = [51,53,55,61,63,65,71,73,75,80,81,82,95,96,99]
+
+// Fetch the forecast for a specific future time (null = current conditions)
+export async function fetchWeatherAt(lat: number, lon: number, targetISO: string | null): Promise<WeatherData> {
+  if (!targetISO) return fetchWeather(lat, lon)
+
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&hourly=temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code` +
+    `&wind_speed_unit=kmh&timezone=auto&forecast_days=16`
+
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Forecast fetch failed')
+  const data = await res.json()
+  const h = data.hourly
+  if (!h?.time?.length) throw new Error('No forecast available for that time')
+
+  const target = new Date(targetISO).getTime()
+  let bestIdx = 0
+  let bestDiff = Infinity
+  for (let i = 0; i < h.time.length; i++) {
+    const diff = Math.abs(new Date(h.time[i]).getTime() - target)
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i }
+  }
+
+  const code: number = h.weather_code[bestIdx]
+  return {
+    tempC: Math.round(h.temperature_2m[bestIdx]),
+    feelsLikeC: Math.round(h.apparent_temperature[bestIdx]),
+    windKph: Math.round(h.wind_speed_10m[bestIdx]),
+    precipMm: h.precipitation[bestIdx],
+    description: weatherDescription(code),
+    isRaining: RAIN_CODES.includes(code),
   }
 }
 

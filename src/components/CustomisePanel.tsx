@@ -65,10 +65,32 @@ function OptionGroup<T extends string>({
   )
 }
 
+// Format a Date as the value a datetime-local input expects (local time)
+function toInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function timeOfDayLabel(iso: string): string {
+  const h = new Date(iso).getHours()
+  if (h < 10) return '🌅 Morning'
+  if (h < 15) return '☀️ Midday'
+  return '🌇 Afternoon'
+}
+
+function daysAhead(iso: string): number {
+  const ms = new Date(iso).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
+}
+
 export default function CustomisePanel({ options, onChange, onClose }: Props) {
   function set<K extends keyof RideOptions>(key: K, value: RideOptions[K]) {
     onChange({ ...options, [key]: value })
   }
+
+  const now = new Date()
+  const max = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000) // ~16-day forecast limit
+  const isFuture = options.dateTime !== null
 
   return (
     <>
@@ -98,6 +120,50 @@ export default function CustomisePanel({ options, onChange, onClose }: Props) {
         </div>
 
         <div className="px-6 pb-10 flex flex-col gap-6">
+          {/* When */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">When</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => set('dateTime', null)}
+                className={`rounded-2xl px-5 py-3 text-sm font-medium transition-all ${
+                  !isFuture
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                Now
+              </button>
+              <input
+                type="datetime-local"
+                value={isFuture ? toInputValue(new Date(options.dateTime!)) : ''}
+                min={toInputValue(now)}
+                max={toInputValue(max)}
+                onChange={e => {
+                  if (!e.target.value) { set('dateTime', null); return }
+                  set('dateTime', new Date(e.target.value).toISOString())
+                }}
+                className={`flex-1 rounded-2xl px-4 py-3 text-sm outline-none transition-all ${
+                  isFuture
+                    ? 'bg-emerald-500/20 ring-2 ring-emerald-500 text-white'
+                    : 'bg-zinc-800 text-zinc-300'
+                }`}
+              />
+            </div>
+            {isFuture && (
+              <p className="text-xs text-zinc-400">
+                Using the forecast for {new Date(options.dateTime!).toLocaleString([], {
+                  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                })} · {timeOfDayLabel(options.dateTime!)}
+              </p>
+            )}
+            {isFuture && daysAhead(options.dateTime!) > 7 && (
+              <p className="text-xs text-amber-400/90">
+                ⚠️ {daysAhead(options.dateTime!)} days out — forecasts get less reliable beyond a week.
+              </p>
+            )}
+          </div>
+
           <OptionGroup
             label="Intensity"
             options={intensityOptions}
@@ -110,12 +176,15 @@ export default function CustomisePanel({ options, onChange, onClose }: Props) {
             value={options.duration}
             onChange={v => set('duration', v)}
           />
-          <OptionGroup
-            label="Time of day"
-            options={timeOptions}
-            value={options.timeOfDay}
-            onChange={v => set('timeOfDay', v)}
-          />
+          {/* Time of day only matters when riding "now"; otherwise it's read from the forecast time */}
+          {!isFuture && (
+            <OptionGroup
+              label="Time of day"
+              options={timeOptions}
+              value={options.timeOfDay}
+              onChange={v => set('timeOfDay', v)}
+            />
+          )}
           <OptionGroup
             label="Units"
             options={unitOptions}

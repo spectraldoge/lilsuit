@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, SavedLocation } from '../types'
 import { defaultRideOptions } from '../types'
-import { fetchWeather, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
+import { fetchWeatherAt, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
 import { getRecommendation, buildShareText } from '../services/outfitAdvisor'
 import { getTemperatureBias, saveRide } from '../store/rideHistoryStore'
 import { loadLocations, saveLocation } from '../store/locationStore'
@@ -30,6 +30,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [copied, setCopied] = useState(false)
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
   const [locationSaved, setLocationSaved] = useState(false)
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => { setSavedLocations(loadLocations()) }, [])
 
@@ -39,7 +40,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
   const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
     setStatus('fetching')
-    const w = await fetchWeather(lat, lon)
+    const w = await fetchWeatherAt(lat, lon, rideOptions.dateTime)
     setWeather(w)
     setCurrentCoords({ lat, lon })
     buildOutfit(w, rideOptions)
@@ -83,9 +84,31 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     await loadFromCoords(loc.lat, loc.lon, loc.name)
   }, [loadFromCoords])
 
-  function handleRideOptionsChange(opts: RideOptions) {
+  async function handleRideOptionsChange(opts: RideOptions) {
+    // Derive time-of-day from a chosen future time so tips stay consistent
+    if (opts.dateTime) {
+      const h = new Date(opts.dateTime).getHours()
+      opts = { ...opts, timeOfDay: h < 10 ? 'morning' : h < 15 ? 'midday' : 'afternoon' }
+    }
+
+    const dateChanged = opts.dateTime !== rideOptions.dateTime
     setRideOptions(opts)
-    if (weather) setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias()))
+
+    if (dateChanged && currentCoords) {
+      // Re-fetch the forecast for the new time
+      setUpdating(true)
+      try {
+        const w = await fetchWeatherAt(currentCoords.lat, currentCoords.lon, opts.dateTime)
+        setWeather(w)
+        setOutfit(getRecommendation(w, profile, opts, getTemperatureBias()))
+      } catch (e) {
+        setError((e as Error).message ?? 'Could not load that forecast')
+      } finally {
+        setUpdating(false)
+      }
+    } else if (weather) {
+      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias()))
+    }
   }
 
   function handleSaveLocation() {
@@ -115,6 +138,11 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   }
 
   useEffect(() => { load() }, [load])
+
+  function daysAhead(iso: string): number {
+    const ms = new Date(iso).getTime() - Date.now()
+    return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
+  }
 
   const isMetric = rideOptions.units === 'metric'
   function displayTemp(c: number) {
@@ -236,8 +264,27 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               </div>
             )}
 
+            {/* Future forecast banner */}
+            {rideOptions.dateTime && (
+              <div className="rounded-2xl bg-blue-500/10 border border-blue-500/30 px-4 py-3 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span>🗓️</span>
+                  <p className="text-sm text-blue-300">
+                    Forecast for {new Date(rideOptions.dateTime).toLocaleString([], {
+                      weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+                {daysAhead(rideOptions.dateTime) > 7 && (
+                  <p className="text-xs text-amber-400/90">
+                    ⚠️ That's {daysAhead(rideOptions.dateTime)} days out — accuracy drops beyond a week, so treat this as a rough guide.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Weather card */}
-            <div className="rounded-3xl bg-zinc-900 p-5 flex items-center justify-between">
+            <div className={`rounded-3xl bg-zinc-900 p-5 flex items-center justify-between transition-opacity ${updating ? 'opacity-50' : ''}`}>
               <div>
                 <div className="text-5xl font-bold text-white">
                   {displayTemp(weather.tempC)}<span className="text-2xl text-zinc-400">{unitLabel()}</span>
