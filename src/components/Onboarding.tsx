@@ -75,6 +75,29 @@ export default function Onboarding({ onComplete }: Props) {
 
   const steps: React.ReactNode[] = []
 
+  // Step — welcome / how it works
+  steps.push(
+    <div key="welcome" className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-semibold text-white">Welcome to lilsuit</h2>
+        <p className="text-zinc-400 text-sm mt-1">Here's how it works.</p>
+      </div>
+      <div className="flex flex-col gap-4">
+        {[
+          { emoji: '🌤️', text: 'Each time you open the app, lilsuit checks the weather where you are and tells you exactly what to wear.' },
+          { emoji: '⚙️', text: 'Tap Customise to change your location, plan for a different day or time, and set how hard and how long you\'re going.' },
+          { emoji: '👤', text: 'Tap the gear icon for Settings, where you update your kit, switch between cycling and running gear, change units, and see your ride history.' },
+          { emoji: '📈', text: 'After a ride, tell us if you were too hot or too cold. lilsuit learns and fine-tunes your recommendations over time.' },
+        ].map(row => (
+          <div key={row.emoji} className="flex items-start gap-3">
+            <span className="text-2xl w-8 text-center shrink-0">{row.emoji}</span>
+            <p className="text-sm text-zinc-300 leading-snug">{row.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   // Step — gender + weight
   steps.push(
     <div key="body" className="flex flex-col gap-6">
@@ -112,7 +135,7 @@ export default function Onboarding({ onComplete }: Props) {
   steps.push(
     <div key="activities" className="flex flex-col gap-6">
       <h2 className="text-2xl font-semibold text-white">What do you do?</h2>
-      <p className="text-zinc-400 text-sm">Pick all that apply — you can switch anytime.</p>
+      <p className="text-zinc-400 text-sm">Pick all that apply. You can switch anytime.</p>
       <div className="flex flex-col gap-3">
         {([['cycling', '🚴 Cycling'], ['running', '🏃 Running']] as ['cycling' | 'running', string][]).map(([a, label]) => (
           <button
@@ -173,7 +196,7 @@ export default function Onboarding({ onComplete }: Props) {
     steps.push(
       <div key="runningkit" className="flex flex-col gap-4">
         <h2 className="text-2xl font-semibold text-white">Your running kit 🏃</h2>
-        <p className="text-zinc-400 text-sm">Shorts and a t-shirt are assumed — tell us the extras you own.</p>
+        <p className="text-zinc-400 text-sm">Shorts and a t-shirt are assumed. Tell us the extras you own.</p>
         <KitGrid items={runningKit} />
       </div>
     )
@@ -182,7 +205,7 @@ export default function Onboarding({ onComplete }: Props) {
   // Clamp step if the dynamic list shrank (e.g. user deselected an activity)
   const safeStep = Math.min(step, steps.length - 1)
   const isLastStep = safeStep === steps.length - 1
-  const onActivityStep = safeStep === 1
+  const onActivityStep = safeStep === 2 // welcome(0), about you(1), activities(2)
   const canAdvance = !onActivityStep || does.cycling || does.running
 
   return (

@@ -1,10 +1,16 @@
-import type { RideOptions, Activity } from '../types'
+import { useState } from 'react'
+import type { RideOptions, Activity, SavedLocation } from '../types'
 
 interface Props {
   options: RideOptions
   activity: Activity
   onChange: (options: RideOptions) => void
   onClose: () => void
+  currentLabel: string
+  savedLocations: SavedLocation[]
+  onUseCurrentLocation: () => Promise<boolean>
+  onPickSaved: (loc: SavedLocation) => void
+  onSearchLocation: (query: string) => Promise<boolean>
 }
 
 type OptionItem<T extends string> = { value: T; label: string; sub: string }
@@ -36,9 +42,9 @@ const durationByActivity: Record<Activity, OptionItem<RideOptions['duration']>[]
 }
 
 const timeOptions: OptionItem<RideOptions['timeOfDay']>[] = [
-  { value: 'morning',   label: '🌅 Morning',   sub: 'Before 10am — coldest part of the day' },
-  { value: 'midday',    label: '☀️ Midday',    sub: '10am–3pm — warmest' },
-  { value: 'afternoon', label: '🌇 Afternoon', sub: 'After 3pm — cooling down' },
+  { value: 'morning',   label: '🌅 Morning',   sub: 'Before 10am, the coldest part of the day' },
+  { value: 'midday',    label: '☀️ Midday',    sub: '10am–3pm, the warmest' },
+  { value: 'afternoon', label: '🌇 Afternoon', sub: 'After 3pm, cooling down' },
 ]
 
 function OptionGroup<T extends string>({
@@ -93,9 +99,32 @@ function daysAhead(iso: string): number {
   return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
 }
 
-export default function CustomisePanel({ options, activity, onChange, onClose }: Props) {
+export default function CustomisePanel({
+  options, activity, onChange, onClose,
+  currentLabel, savedLocations, onUseCurrentLocation, onPickSaved, onSearchLocation,
+}: Props) {
   function set<K extends keyof RideOptions>(key: K, value: RideOptions[K]) {
     onChange({ ...options, [key]: value })
+  }
+
+  const [addr, setAddr] = useState('')
+  const [locBusy, setLocBusy] = useState(false)
+  const [locError, setLocError] = useState('')
+
+  async function handleUseCurrent() {
+    setLocBusy(true); setLocError('')
+    const ok = await onUseCurrentLocation()
+    if (!ok) setLocError("Couldn't get your current location.")
+    setLocBusy(false)
+  }
+
+  async function handleSearch() {
+    if (!addr.trim()) return
+    setLocBusy(true); setLocError('')
+    const ok = await onSearchLocation(addr)
+    if (ok) setAddr('')
+    else setLocError("Couldn't find that place. Try a city or postcode.")
+    setLocBusy(false)
   }
 
   const intensityOptions = intensityByActivity[activity]
@@ -133,6 +162,57 @@ export default function CustomisePanel({ options, activity, onChange, onClose }:
         </div>
 
         <div className="px-6 pb-10 flex flex-col gap-6">
+          {/* Where */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Where</p>
+            {currentLabel && (
+              <p className="text-sm text-zinc-300">📍 {currentLabel.split(',')[0]}</p>
+            )}
+            <button
+              onClick={handleUseCurrent}
+              disabled={locBusy}
+              className="rounded-2xl bg-zinc-800 px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-700 transition-all disabled:opacity-50 text-left"
+            >
+              📍 Use my current location
+            </button>
+            {savedLocations.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {savedLocations.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => onPickSaved(loc)}
+                    disabled={locBusy}
+                    className="rounded-full bg-zinc-800 px-4 py-2 text-sm text-white hover:bg-zinc-700 transition-all disabled:opacity-50"
+                  >
+                    📍 {loc.name.split(',')[0]}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="City, town, or postcode"
+                value={addr}
+                onChange={e => setAddr(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                className="flex-1 rounded-2xl bg-zinc-800 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                onClick={handleSearch}
+                disabled={!addr.trim() || locBusy}
+                className={`rounded-2xl px-5 py-3 text-sm font-medium transition-all ${
+                  addr.trim() && !locBusy
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                }`}
+              >
+                {locBusy ? '…' : 'Search'}
+              </button>
+            </div>
+            {locError && <p className="text-red-400 text-xs">{locError}</p>}
+          </div>
+
           {/* When */}
           <div className="flex flex-col gap-2">
             <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">When</p>
@@ -172,7 +252,7 @@ export default function CustomisePanel({ options, activity, onChange, onClose }:
             )}
             {isFuture && daysAhead(options.dateTime!) > 7 && (
               <p className="text-xs text-amber-400/90">
-                ⚠️ {daysAhead(options.dateTime!)} days out — forecasts get less reliable beyond a week.
+                ⚠️ {daysAhead(options.dateTime!)} days out. Forecasts get less reliable beyond a week.
               </p>
             )}
           </div>

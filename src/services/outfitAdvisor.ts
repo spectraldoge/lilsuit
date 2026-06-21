@@ -166,12 +166,12 @@ function buildCyclingItems(effective: number, weather: WeatherData, profile: Use
     if (profile.hasRainJacket)
       items.push({ category: 'top', name: 'Rain jacket', emoji: '🌧️' })
     else
-      notes.push('Rain expected — waterproof jacket recommended')
+      notes.push('Rain expected. Waterproof jacket recommended')
     if (!profile.hasOvershoes)
       notes.push('Overshoes would keep your feet dry')
   }
   if (weather.windKph > 40)
-    notes.push(`Strong wind (${weather.windKph} km/h) — add a windproof layer if you have one`)
+    notes.push(`Strong wind (${weather.windKph} km/h). Add a windproof layer if you have one`)
 
   return { items, notes }
 }
@@ -241,11 +241,11 @@ function buildRunningItems(effective: number, weather: WeatherData, profile: Use
   // Rain
   if (weather.isRaining) {
     if (profile.runJacket) items.push({ category: 'top', name: 'Running jacket', emoji: '🌧️' })
-    else notes.push('Rain expected — a light waterproof running jacket helps')
+    else notes.push('Rain expected. A light waterproof running jacket helps')
     if (profile.runCap) items.push({ category: 'head', name: 'Peaked cap (keeps rain off your face)', emoji: '🧢' })
   }
   if (weather.windKph > 40)
-    notes.push(`Strong wind (${weather.windKph} km/h) — a windproof layer makes a big difference`)
+    notes.push(`Strong wind (${weather.windKph} km/h). A windproof layer makes a big difference`)
 
   return { items, notes }
 }
@@ -253,38 +253,38 @@ function buildRunningItems(effective: number, weather: WeatherData, profile: Use
 function headlineFor(temp: number): string {
   if (temp < 0)  return 'Proper winter kit today'
   if (temp < 5)  return 'Full winter kit'
-  if (temp < 10) return 'Cold — layer up'
-  if (temp < 15) return 'Cool — dress smart'
-  if (temp < 20) return 'Mild — light kit'
-  if (temp < 25) return 'Warm — keep it simple'
-  return 'Hot — go minimal'
+  if (temp < 10) return 'Cold. Layer up'
+  if (temp < 15) return 'Cool. Dress smart'
+  if (temp < 20) return 'Mild. Light kit'
+  if (temp < 25) return 'Warm. Keep it simple'
+  return 'Hot. Go minimal'
 }
 
 function getRideTip(weather: WeatherData, ride: RideOptions, effective: number): string | null {
   if (ride.timeOfDay === 'morning' && effective < 15 && ride.duration !== 'short')
-    return "You'll warm up after 20–30 mins — a gilet or arm warmers in your pocket is good insurance."
+    return "You'll warm up after 20–30 mins. A gilet or arm warmers in your pocket is good insurance."
   if (ride.intensity === 'hard' && effective > 15)
-    return "Hard efforts generate a lot of heat — start feeling slightly cool and you'll be perfect at pace."
+    return "Hard efforts generate a lot of heat. Start feeling slightly cool and you'll be perfect at pace."
   if (ride.duration === 'long' && ride.timeOfDay !== 'midday')
-    return "Long ride: pack an extra layer — you'll cool down fast whenever you stop."
+    return "Long ride: pack an extra layer. You'll cool down fast whenever you stop."
   if (weather.isRaining && ride.duration === 'long')
     return "Wet kit in the cold gets heavy. A dry base layer change at the halfway mark makes a big difference."
   if (effective > 25)
-    return "Stay on top of hydration — at this temp you'll sweat more than you realise."
+    return "Stay on top of hydration. At this temp you'll sweat more than you realise."
   if (ride.intensity === 'easy' && effective < 10)
-    return "Easy pace means less body heat — dress one layer warmer than you think."
+    return "Easy pace means less body heat. Dress one layer warmer than you think."
   return null
 }
 
 function getRunTip(weather: WeatherData, ride: RideOptions, effective: number): string | null {
   if (effective < 12)
-    return "Dress so you feel slightly cool standing still — you'll warm up within the first kilometre."
+    return "Dress so you feel slightly cool standing still. You'll warm up within the first kilometre."
   if (ride.intensity === 'hard' && effective > 15)
-    return 'Hard session in the warmth — start a touch cool and you’ll be glad of it at pace.'
+    return 'Hard session in the warmth. Start a touch cool and you’ll be glad of it at pace.'
   if (effective > 24)
-    return 'Hot out there — run easier than planned, seek shade, and drink before you feel thirsty.'
+    return 'Hot out there. Run easier than planned, seek shade, and drink before you feel thirsty.'
   if (weather.isRaining)
-    return 'A peaked cap keeps the rain out of your eyes — often more useful than a jacket.'
+    return 'A peaked cap keeps the rain out of your eyes, often more useful than a jacket.'
   if (ride.duration === 'long')
     return 'Long run: a layer you can tie round your waist beats one you have to carry.'
   return null

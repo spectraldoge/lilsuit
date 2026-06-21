@@ -49,17 +49,22 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC, activity), activity))
   }, [profile, activity])
 
-  const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
-    setStatus('fetching')
-    const w = await fetchWeatherAt(lat, lon, rideOptions.dateTime)
-    setWeather(w)
-    setCurrentCoords({ lat, lon })
-    buildOutfit(w, rideOptions)
-    if (label) setLocationLabel(label)
-    setStatus('done')
-    setFeedbackDone(false)
-    setLocationSaved(false)
-    setCustomMode(false)
+  const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string, quiet = false) => {
+    if (quiet) setUpdating(true)
+    else setStatus('fetching')
+    try {
+      const w = await fetchWeatherAt(lat, lon, rideOptions.dateTime)
+      setWeather(w)
+      setCurrentCoords({ lat, lon })
+      buildOutfit(w, rideOptions)
+      if (label) setLocationLabel(label)
+      setStatus('done')
+      setFeedbackDone(false)
+      setLocationSaved(false)
+      setCustomMode(false)
+    } finally {
+      if (quiet) setUpdating(false)
+    }
   }, [rideOptions, buildOutfit])
 
   const load = useCallback(async () => {
@@ -74,7 +79,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       // should let the user type a location instead of dead-ending.
       if (e instanceof GeolocationPositionError || isLocationDenied(e)) {
         if (isLocationDenied(e)) setError('')
-        else setError("Couldn't get your location automatically — enter it below.")
+        else setError("Couldn't get your location automatically. Enter it below.")
         setStatus('needs_address')
       } else {
         setError((e as Error).message || 'Something went wrong fetching the weather.')
@@ -99,6 +104,28 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const loadFromSaved = useCallback(async (loc: SavedLocation) => {
     await loadFromCoords(loc.lat, loc.lon, loc.name)
   }, [loadFromCoords])
+
+  // ── Location handlers for the Customise panel (quiet refresh) ────────────────
+  async function panelPickSaved(loc: SavedLocation) {
+    try { await loadFromCoords(loc.lat, loc.lon, loc.name, true) } catch { /* ignore */ }
+  }
+
+  async function panelSearchLocation(query: string): Promise<boolean> {
+    try {
+      const { lat, lon, displayName } = await geocodeAddress(query.trim())
+      await loadFromCoords(lat, lon, displayName, true)
+      return true
+    } catch { return false }
+  }
+
+  async function panelUseCurrentLocation(): Promise<boolean> {
+    try {
+      const coords = await getCurrentLocation()
+      const name = await reverseGeocode(coords.latitude, coords.longitude)
+      await loadFromCoords(coords.latitude, coords.longitude, name, true)
+      return true
+    } catch { return false }
+  }
 
   async function handleRideOptionsChange(opts: RideOptions) {
     // Derive time-of-day from a chosen future time so tips stay consistent
@@ -395,7 +422,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
                 </div>
                 {daysAhead(rideOptions.dateTime) > 7 && (
                   <p className="text-xs text-amber-400/90">
-                    ⚠️ That's {daysAhead(rideOptions.dateTime)} days out — accuracy drops beyond a week, so treat this as a rough guide.
+                    ⚠️ That's {daysAhead(rideOptions.dateTime)} days out. Accuracy drops beyond a week, so treat this as a rough guide.
                   </p>
                 )}
               </div>
@@ -549,7 +576,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
             {/* Feedback confirmation */}
             {feedbackDone && (
               <p className="text-sm text-emerald-400 text-center">
-                ✓ Thanks — we'll calibrate your next recommendation
+                ✓ Thanks! We'll calibrate your next recommendation
               </p>
             )}
 
@@ -622,6 +649,11 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
           activity={activity}
           onChange={handleRideOptionsChange}
           onClose={() => setShowCustomise(false)}
+          currentLabel={locationLabel}
+          savedLocations={savedLocations}
+          onUseCurrentLocation={panelUseCurrentLocation}
+          onPickSaved={panelPickSaved}
+          onSearchLocation={panelSearchLocation}
         />
       )}
 

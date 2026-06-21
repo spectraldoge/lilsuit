@@ -47,7 +47,7 @@ export default function LogRideModal({ units, onSave, onClose }: Props) {
 
         <div className="px-6 pb-10 flex flex-col gap-6">
           <p className="text-sm text-zinc-400 -mt-2">
-            Tell us about a ride and how it felt — we'll use it to fine-tune recommendations for that kind of weather.
+            Tell us about a ride and how it felt. We'll use it to fine-tune recommendations for that kind of weather.
           </p>
 
           {/* Temperature */}

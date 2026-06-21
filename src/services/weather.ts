@@ -65,7 +65,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; lo
   const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
   if (!res.ok) throw new Error('Geocoding failed')
   const results = await res.json()
-  if (!results.length) throw new Error(`Couldn't find "${address}" — try a city or postcode`)
+  if (!results.length) throw new Error(`Couldn't find "${address}". Try a city or postcode`)
   const { lat, lon, display_name } = results[0]
   return { lat: parseFloat(lat), lon: parseFloat(lon), displayName: display_name }
 }

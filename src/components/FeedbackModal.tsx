@@ -7,7 +7,7 @@ interface Props {
 
 const options: { value: FeedbackValue; label: string; sub: string }[] = [
   { value: 'too_hot',    label: '🥵 Too hot',     sub: 'I was sweating too much' },
-  { value: 'just_right', label: '👌 Just right',  sub: 'Perfect — nailed it' },
+  { value: 'just_right', label: '👌 Just right',  sub: 'Perfect. Nailed it' },
   { value: 'too_cold',   label: '🥶 Too cold',    sub: 'I needed another layer' },
 ]
 

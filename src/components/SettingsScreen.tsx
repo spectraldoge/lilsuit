@@ -190,7 +190,7 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
         {/* Running kit */}
         <section className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">🏃 Running kit</label>
-          <p className="text-xs text-zinc-600 -mt-1">Shorts and a t-shirt are assumed — just tell us the extras you own.</p>
+          <p className="text-xs text-zinc-600 -mt-1">Shorts and a t-shirt are assumed. Just tell us the extras you own.</p>
           <div className="grid grid-cols-2 gap-2">
             {runningKitItems.map(item => (
               <button key={item.key}
