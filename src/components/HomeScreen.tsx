@@ -37,6 +37,11 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [locationSaved, setLocationSaved] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [activity, setActivity] = useState<Activity>(loadActivity())
+  const [customMode, setCustomMode] = useState(false)
+  const [customWeather, setCustomWeather] = useState<WeatherData | null>(null)
+
+  // The weather actually driving the recommendation/display
+  const activeWeather = customMode && customWeather ? customWeather : weather
 
   useEffect(() => { setSavedLocations(loadLocations()) }, [])
 
@@ -54,6 +59,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     setStatus('done')
     setFeedbackDone(false)
     setLocationSaved(false)
+    setCustomMode(false)
   }, [rideOptions, buildOutfit])
 
   const load = useCallback(async () => {
@@ -104,7 +110,10 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     const dateChanged = opts.dateTime !== rideOptions.dateTime
     setRideOptions(opts)
 
-    if (dateChanged && currentCoords) {
+    // Picking a date means "use the real forecast" — leave custom-weather mode
+    if (dateChanged && customMode) setCustomMode(false)
+
+    if (dateChanged && currentCoords && !customMode) {
       // Re-fetch the forecast for the new time
       setUpdating(true)
       try {
@@ -116,8 +125,8 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       } finally {
         setUpdating(false)
       }
-    } else if (weather) {
-      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias(weather.feelsLikeC, activity), activity))
+    } else if (activeWeather) {
+      setOutfit(getRecommendation(activeWeather, profile, opts, getTemperatureBias(activeWeather.feelsLikeC, activity), activity))
     }
   }
 
@@ -125,9 +134,38 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     if (next === activity) return
     setActivity(next)
     saveActivity(next)
-    if (weather) {
-      setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC, next), next))
+    if (activeWeather) {
+      setOutfit(getRecommendation(activeWeather, profile, rideOptions, getTemperatureBias(activeWeather.feelsLikeC, next), next))
     }
+  }
+
+  // ── Custom weather (sandbox) ────────────────────────────────────────────────
+  function recomputeFrom(w: WeatherData) {
+    setOutfit(getRecommendation(w, profile, rideOptions, getTemperatureBias(w.feelsLikeC, activity), activity))
+  }
+
+  function enterCustomWeather() {
+    const base: WeatherData = weather
+      ? { ...weather }
+      : { tempC: 15, feelsLikeC: 15, windKph: 0, precipMm: 0, description: 'Custom', isRaining: false }
+    setCustomWeather(base)
+    setCustomMode(true)
+    recomputeFrom(base)
+  }
+
+  function exitCustomWeather() {
+    setCustomMode(false)
+    if (weather) recomputeFrom(weather)
+  }
+
+  function updateCustomWeather(patch: Partial<WeatherData>) {
+    if (!customWeather) return
+    const next = { ...customWeather, ...patch }
+    // a single chosen temperature drives both the air and felt temperature
+    if (patch.tempC !== undefined) next.feelsLikeC = patch.tempC
+    next.description = next.isRaining ? 'Rainy (custom)' : 'Custom'
+    setCustomWeather(next)
+    recomputeFrom(next)
   }
 
   function handleSaveLocation() {
@@ -151,8 +189,8 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   }
 
   async function handleAddToReminders() {
-    if (!outfit || !weather) return
-    const nutrition = getNutrition(weather, rideOptions, activity)
+    if (!outfit || !activeWeather) return
+    const nutrition = getNutrition(activeWeather, rideOptions, activity)
     const lines = [`${activity === 'running' ? '🏃' : '🚴'} lilsuit ${activity === 'running' ? 'run' : 'ride'} kit`, '']
     outfit.items.forEach(i => lines.push(`• ${i.name}`))
     lines.push('', `• 💧 ${nutrition.hydration}`)
@@ -326,7 +364,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
         )}
 
         {/* Results */}
-        {status === 'done' && weather && outfit && (
+        {status === 'done' && activeWeather && outfit && (
           <>
             {/* Location row */}
             {locationLabel && (
@@ -345,7 +383,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
             )}
 
             {/* Future forecast banner */}
-            {rideOptions.dateTime && (
+            {rideOptions.dateTime && !customMode && (
               <div className="rounded-2xl bg-blue-500/10 border border-blue-500/30 px-4 py-3 flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <span>🗓️</span>
@@ -364,15 +402,15 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
             )}
 
             {/* Weather card */}
-            <div className={`rounded-3xl bg-zinc-900 p-5 flex items-center justify-between transition-opacity ${updating ? 'opacity-50' : ''}`}>
+            <div className={`rounded-3xl p-5 flex items-center justify-between transition-opacity ${updating ? 'opacity-50' : ''} ${customMode ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-zinc-900'}`}>
               <div>
                 <div className="text-5xl font-bold text-white">
-                  {displayTemp(weather.tempC)}<span className="text-2xl text-zinc-400">{unitLabel()}</span>
+                  {displayTemp(activeWeather.tempC)}<span className="text-2xl text-zinc-400">{unitLabel()}</span>
                 </div>
-                <div className="text-zinc-400 text-sm mt-1">{weather.description}</div>
+                <div className="text-zinc-400 text-sm mt-1">{customMode ? '✏️ Custom weather' : activeWeather.description}</div>
                 <div className="text-zinc-500 text-xs mt-1">
-                  Feels {displayTemp(weather.feelsLikeC)}{unitLabel()} · {displayWind(weather.windKph)}
-                  {weather.isRaining ? ' · 🌧️ Rain' : ''}
+                  Feels {displayTemp(activeWeather.feelsLikeC)}{unitLabel()} · {displayWind(activeWeather.windKph)}
+                  {activeWeather.isRaining ? ' · 🌧️ Rain' : ''}
                 </div>
               </div>
               <div className="text-right">
@@ -383,6 +421,58 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
                 <div className="text-xs text-zinc-500 mt-1">for you</div>
               </div>
             </div>
+
+            {/* Choose your own weather */}
+            {!customMode ? (
+              <button
+                onClick={enterCustomWeather}
+                className="text-xs text-zinc-500 hover:text-emerald-400 transition-all self-start"
+              >
+                ✏️ Choose your own weather
+              </button>
+            ) : (
+              <div className="rounded-3xl bg-zinc-900 p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Custom weather</h3>
+                  <button onClick={exitCustomWeather} className="text-xs text-emerald-500 hover:text-emerald-400 transition-all">
+                    Use real weather
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-zinc-400">
+                    Temperature: <span className="text-white font-medium">{displayTemp(customWeather!.tempC)}{unitLabel()}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={isMetric ? -10 : 14}
+                    max={isMetric ? 40 : 104}
+                    step={1}
+                    value={isMetric ? customWeather!.tempC : Math.round(customWeather!.tempC * 9 / 5 + 32)}
+                    onChange={e => {
+                      const v = Number(e.target.value)
+                      updateCustomWeather({ tempC: isMetric ? v : Math.round((v - 32) * 5 / 9) })
+                    }}
+                    className="accent-emerald-500"
+                  />
+                </div>
+
+                <button
+                  onClick={() => updateCustomWeather({ isRaining: !customWeather!.isRaining })}
+                  className={`rounded-2xl py-3 text-sm font-medium transition-all ${
+                    customWeather!.isRaining
+                      ? 'bg-emerald-500/20 ring-2 ring-emerald-500 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  🌧️ Raining {customWeather!.isRaining ? 'on' : 'off'}
+                </button>
+
+                <p className="text-xs text-zinc-500">
+                  Planning a ride in the future? Use the <span className="text-zinc-300">change date</span> option in <span className="text-zinc-300">Customise</span> for the real forecast.
+                </p>
+              </div>
+            )}
 
             {/* Headline + tip */}
             <div className="rounded-3xl bg-emerald-500/10 border border-emerald-500/30 p-5">
@@ -411,7 +501,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
 
             {/* Nutrition */}
             {(() => {
-              const nutrition = getNutrition(weather, rideOptions, activity)
+              const nutrition = getNutrition(activeWeather, rideOptions, activity)
               return (
                 <div className="rounded-3xl bg-zinc-900 p-5 flex flex-col gap-3">
                   <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Fuel & hydration</h3>
