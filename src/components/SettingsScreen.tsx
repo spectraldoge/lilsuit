@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { UserProfile, Gender, CustomKitItem } from '../types'
+import type { UserProfile, Gender, CustomKitItem, Units } from '../types'
 import { saveProfile } from '../store/profileStore'
 import { loadLocations, deleteLocation } from '../store/locationStore'
 import { loadTheme, saveTheme, applyTheme, type Theme } from '../store/themeStore'
@@ -235,6 +235,19 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
               ))}
             </div>
           )}
+        </section>
+
+        {/* Units */}
+        <section className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Units</label>
+          <div className="grid grid-cols-2 gap-2">
+            {([['metric', '°C / km'], ['imperial', '°F / mi']] as [Units, string][]).map(([u, label]) => (
+              <button key={u} onClick={() => set('units', u)}
+                className={`rounded-2xl py-3 text-sm font-medium transition-all ${
+                  draft.units === u ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}>{label}</button>
+            ))}
+          </div>
         </section>
 
         {/* Theme */}

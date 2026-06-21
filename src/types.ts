@@ -26,6 +26,7 @@ export interface UserProfile {
   runsHot: boolean
   runsCold: boolean
   customItems: CustomKitItem[]
+  units: Units
 }
 
 export interface SavedLocation {
@@ -59,7 +60,6 @@ export interface RideOptions {
   intensity: Intensity
   duration: Duration
   timeOfDay: TimeOfDay
-  units: Units
   dateTime: string | null  // ISO string for a future ride, null = ride now
 }
 
@@ -67,7 +67,6 @@ export const defaultRideOptions: RideOptions = {
   intensity: 'moderate',
   duration: 'medium',
   timeOfDay: 'morning',
-  units: 'metric',
   dateTime: null,
 }
 

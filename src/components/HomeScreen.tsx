@@ -144,7 +144,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)))
   }
 
-  const isMetric = rideOptions.units === 'metric'
+  const isMetric = profile.units === 'metric'
   function displayTemp(c: number) {
     return isMetric ? `${c}°` : `${Math.round(c * 9 / 5 + 32)}°`
   }

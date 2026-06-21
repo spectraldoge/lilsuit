@@ -21,6 +21,7 @@ export const defaultProfile: UserProfile = {
   runsHot: false,
   runsCold: false,
   customItems: [],
+  units: 'metric',
 }
 
 export function loadProfile(): UserProfile | null {
@@ -31,6 +32,7 @@ export function loadProfile(): UserProfile | null {
     // migrate older saved profiles
     if (!parsed.customItems) parsed.customItems = []
     if (parsed.hasRainJacket === undefined) parsed.hasRainJacket = false
+    if (!parsed.units) parsed.units = 'metric'
     return parsed
   } catch {
     return null

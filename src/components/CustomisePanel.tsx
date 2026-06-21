@@ -26,11 +26,6 @@ const timeOptions: OptionItem<RideOptions['timeOfDay']>[] = [
   { value: 'afternoon', label: '🌇 Afternoon', sub: 'After 3pm — cooling down' },
 ]
 
-const unitOptions: OptionItem<RideOptions['units']>[] = [
-  { value: 'metric',   label: '°C / km',  sub: 'Celsius and kilometres' },
-  { value: 'imperial', label: '°F / mi',  sub: 'Fahrenheit and miles' },
-]
-
 function OptionGroup<T extends string>({
   label,
   options,
@@ -185,12 +180,6 @@ export default function CustomisePanel({ options, onChange, onClose }: Props) {
               onChange={v => set('timeOfDay', v)}
             />
           )}
-          <OptionGroup
-            label="Units"
-            options={unitOptions}
-            value={options.units}
-            onChange={v => set('units', v)}
-          />
         </div>
       </div>
     </>
