@@ -20,19 +20,7 @@ export default function Onboarding({ onComplete }: Props) {
   }
 
   const steps = [
-    // Step 0 — name
-    <div key="name" className="flex flex-col gap-6">
-      <h2 className="text-2xl font-semibold text-white">What should we call you?</h2>
-      <input
-        type="text"
-        placeholder="Your name"
-        value={profile.name}
-        onChange={e => set('name', e.target.value)}
-        className="w-full rounded-2xl bg-zinc-800 px-5 py-4 text-lg text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-500"
-      />
-    </div>,
-
-    // Step 1 — gender + weight
+    // Step 0 — gender + weight
     <div key="body" className="flex flex-col gap-6">
       <h2 className="text-2xl font-semibold text-white">A bit about you</h2>
       <div className="flex flex-col gap-2">
@@ -118,8 +106,7 @@ export default function Onboarding({ onComplete }: Props) {
   ]
 
   const isLastStep = step === steps.length - 1
-  const canAdvance =
-    step === 0 ? profile.name.trim().length > 0 : true
+  const canAdvance = true
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 px-6 pt-16 pb-12">
