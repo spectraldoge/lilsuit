@@ -164,6 +164,7 @@ const kitItems = [
   { key: 'hasThermalBibs',  label: 'Thermal bibs',    emoji: '🩲' },
   { key: 'hasLightJacket',  label: 'Light jacket',    emoji: '🧥' },
   { key: 'hasWinterJacket', label: 'Winter jacket',   emoji: '❄️' },
+  { key: 'hasRainJacket',   label: 'Rain jacket',     emoji: '🌧️' },
   { key: 'hasBaseLayer',    label: 'Base layer',      emoji: '👕' },
   { key: 'hasLightGloves',  label: 'Light gloves',    emoji: '🤲' },
   { key: 'hasWinterGloves', label: 'Winter gloves',   emoji: '🧤' },

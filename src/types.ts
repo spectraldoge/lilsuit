@@ -1,33 +1,38 @@
 export type Gender = 'male' | 'female' | 'other'
 
+export interface CustomKitItem {
+  id: string
+  name: string
+  category: 'top' | 'legs' | 'hands' | 'head' | 'feet' | 'extra'
+  wearBelowC: number
+}
+
 export interface UserProfile {
   name: string
   gender: Gender
   weightKg: number
-  // kit preferences
   hasGilet: boolean
   hasArmWarmers: boolean
   hasLegWarmers: boolean
   hasThermalBibs: boolean
   hasWinterJacket: boolean
   hasLightJacket: boolean
+  hasRainJacket: boolean
   hasBaseLayer: boolean
   hasWinterGloves: boolean
   hasLightGloves: boolean
   hasOvershoes: boolean
   hasSkullCap: boolean
-  // personal running temp
-  runsHot: boolean  // feels warmer than average
-  runsCold: boolean // feels cooler than average
-  // user-defined kit
+  runsHot: boolean
+  runsCold: boolean
   customItems: CustomKitItem[]
 }
 
-export interface CustomKitItem {
+export interface SavedLocation {
   id: string
   name: string
-  category: 'top' | 'legs' | 'hands' | 'head' | 'feet' | 'extra'
-  wearBelowC: number  // include in recommendation when effective temp is below this
+  lat: number
+  lon: number
 }
 
 export interface WeatherData {
@@ -67,22 +72,16 @@ export const defaultRideOptions: RideOptions = {
 export interface OutfitRecommendation {
   items: OutfitItem[]
   headline: string
+  tip: string | null
   notes: string[]
   effectiveTempC: number
 }
 
-// Stubs for future feedback + wardrobe features
+export type FeedbackValue = 'too_hot' | 'just_right' | 'too_cold'
+
 export interface RideResult {
   id: string
   date: string
-  weatherSnapshot: WeatherData
-  outfitSnapshot: OutfitItem[]
-  feedback: 'too_hot' | 'just_right' | 'too_cold'
-}
-
-export interface WardrobeItem {
-  id: string
-  name: string
-  category: OutfitItem['category']
-  warmthRating: 1 | 2 | 3 | 4 | 5
+  effectiveTempC: number
+  feedback: FeedbackValue
 }

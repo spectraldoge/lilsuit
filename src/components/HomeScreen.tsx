@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions } from '../types'
+import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, SavedLocation } from '../types'
 import { defaultRideOptions } from '../types'
-import { fetchWeather, getCurrentLocation, geocodeAddress, isLocationDenied } from '../services/weather'
-import { getRecommendation } from '../services/outfitAdvisor'
+import { fetchWeather, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
+import { getRecommendation, buildShareText } from '../services/outfitAdvisor'
+import { getTemperatureBias, saveRide } from '../store/rideHistoryStore'
+import { loadLocations, saveLocation } from '../store/locationStore'
 import CustomisePanel from './CustomisePanel'
+import FeedbackModal from './FeedbackModal'
 
 interface Props {
   profile: UserProfile
@@ -19,29 +22,40 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [error, setError] = useState('')
   const [address, setAddress] = useState('')
   const [locationLabel, setLocationLabel] = useState('')
+  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lon: number } | null>(null)
   const [rideOptions, setRideOptions] = useState<RideOptions>(defaultRideOptions)
   const [showCustomise, setShowCustomise] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackDone, setFeedbackDone] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
+  const [locationSaved, setLocationSaved] = useState(false)
+
+  useEffect(() => { setSavedLocations(loadLocations()) }, [])
 
   const buildOutfit = useCallback((w: WeatherData, opts: RideOptions) => {
-    setOutfit(getRecommendation(w, profile, opts))
+    setOutfit(getRecommendation(w, profile, opts, getTemperatureBias()))
   }, [profile])
 
   const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
     setStatus('fetching')
     const w = await fetchWeather(lat, lon)
     setWeather(w)
+    setCurrentCoords({ lat, lon })
     buildOutfit(w, rideOptions)
     if (label) setLocationLabel(label)
     setStatus('done')
-  }, [profile, rideOptions, buildOutfit])
+    setFeedbackDone(false)
+    setLocationSaved(false)
+  }, [rideOptions, buildOutfit])
 
   const load = useCallback(async () => {
     setStatus('locating')
     setError('')
     try {
       const coords = await getCurrentLocation()
-      await loadFromCoords(coords.latitude, coords.longitude)
+      const cityName = await reverseGeocode(coords.latitude, coords.longitude)
+      await loadFromCoords(coords.latitude, coords.longitude, cityName)
     } catch (e) {
       if (isLocationDenied(e)) {
         setStatus('needs_address')
@@ -65,15 +79,26 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     }
   }, [address, loadFromCoords])
 
-  async function handleShare(outfit: OutfitRecommendation) {
-    const itemNames = outfit.items
-      .filter(i => i.category !== 'extra')
-      .map(i => i.name.toLowerCase())
-    const list = itemNames.length <= 2
-      ? itemNames.join(' and ')
-      : itemNames.slice(0, -1).join(', ') + ' and ' + itemNames.at(-1)
-    const text = `I'm wearing ${list}, thanks to lilsuit.netlify.app 🚴`
+  const loadFromSaved = useCallback(async (loc: SavedLocation) => {
+    await loadFromCoords(loc.lat, loc.lon, loc.name)
+  }, [loadFromCoords])
 
+  function handleRideOptionsChange(opts: RideOptions) {
+    setRideOptions(opts)
+    if (weather) setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias()))
+  }
+
+  function handleSaveLocation() {
+    if (!currentCoords || !locationLabel) return
+    const saved = saveLocation({ name: locationLabel, lat: currentCoords.lat, lon: currentCoords.lon })
+    setSavedLocations(loadLocations())
+    setLocationSaved(true)
+    return saved
+  }
+
+  async function handleShare() {
+    if (!outfit) return
+    const text = buildShareText(outfit)
     if (navigator.share) {
       await navigator.share({ text })
     } else {
@@ -83,23 +108,26 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     }
   }
 
-  // Re-compute outfit whenever ride options change (no need to re-fetch weather)
-  function handleRideOptionsChange(opts: RideOptions) {
-    setRideOptions(opts)
-    if (weather) buildOutfit(weather, opts)
+  function handleFeedback(f: 'too_hot' | 'just_right' | 'too_cold') {
+    if (outfit) saveRide(outfit.effectiveTempC, f)
+    setShowFeedback(false)
+    setFeedbackDone(true)
   }
 
   useEffect(() => { load() }, [load])
 
   const isMetric = rideOptions.units === 'metric'
   function displayTemp(c: number) {
-    if (isMetric) return `${c}°C`
-    return `${Math.round(c * 9 / 5 + 32)}°F`
+    return isMetric ? `${c}°` : `${Math.round(c * 9 / 5 + 32)}°`
   }
+  function unitLabel() { return isMetric ? 'C' : 'F' }
   function displayWind(kph: number) {
-    if (isMetric) return `${kph} km/h`
-    return `${Math.round(kph * 0.621)} mph`
+    return isMetric ? `${kph} km/h` : `${Math.round(kph * 0.621)} mph`
   }
+
+  const alreadySaved = currentCoords
+    ? savedLocations.some(l => Math.abs(l.lat - currentCoords.lat) < 0.01 && Math.abs(l.lon - currentCoords.lon) < 0.01)
+    : false
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 pb-8">
@@ -138,6 +166,22 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               <h2 className="text-xl font-semibold text-white mt-3">Where are you riding?</h2>
               <p className="text-zinc-400 text-sm mt-1">Enter a city, town, or postcode</p>
             </div>
+
+            {/* Saved location chips */}
+            {savedLocations.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {savedLocations.map(loc => (
+                  <button
+                    key={loc.id}
+                    onClick={() => loadFromSaved(loc)}
+                    className="rounded-full bg-zinc-800 px-4 py-2 text-sm text-white hover:bg-zinc-700 transition-all"
+                  >
+                    📍 {loc.name.split(',')[0]}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <input
               type="text"
@@ -154,7 +198,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               className={`rounded-2xl py-4 font-medium transition-all ${
                 address.trim()
                   ? 'bg-emerald-500 text-white hover:bg-emerald-400'
-                  : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
               }`}
             >
               Get forecast
@@ -176,30 +220,49 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
         {/* Results */}
         {status === 'done' && weather && outfit && (
           <>
+            {/* Location row */}
             {locationLabel && (
-              <p className="text-xs text-zinc-500 truncate">📍 {locationLabel}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-zinc-500 truncate">📍 {locationLabel.split(',')[0]}</p>
+                {!alreadySaved && !locationSaved && (
+                  <button
+                    onClick={handleSaveLocation}
+                    className="text-xs text-emerald-500 hover:text-emerald-400 transition-all shrink-0 ml-2"
+                  >
+                    Save location
+                  </button>
+                )}
+                {locationSaved && <p className="text-xs text-emerald-500 shrink-0 ml-2">✓ Saved</p>}
+              </div>
             )}
 
             {/* Weather card */}
             <div className="rounded-3xl bg-zinc-900 p-5 flex items-center justify-between">
               <div>
-                <div className="text-5xl font-bold text-white">{displayTemp(weather.tempC)}</div>
+                <div className="text-5xl font-bold text-white">
+                  {displayTemp(weather.tempC)}<span className="text-2xl text-zinc-400">{unitLabel()}</span>
+                </div>
                 <div className="text-zinc-400 text-sm mt-1">{weather.description}</div>
                 <div className="text-zinc-500 text-xs mt-1">
-                  Feels {displayTemp(weather.feelsLikeC)} · Wind {displayWind(weather.windKph)}
+                  Feels {displayTemp(weather.feelsLikeC)}{unitLabel()} · {displayWind(weather.windKph)}
                   {weather.isRaining ? ' · 🌧️ Rain' : ''}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-zinc-500 mb-1">effective temp</div>
-                <div className="text-3xl font-semibold text-emerald-400">{displayTemp(outfit.effectiveTempC)}</div>
+                <div className="text-xs text-zinc-500 mb-1">effective</div>
+                <div className="text-3xl font-semibold text-emerald-400">
+                  {displayTemp(outfit.effectiveTempC)}{unitLabel()}
+                </div>
                 <div className="text-xs text-zinc-500 mt-1">for you</div>
               </div>
             </div>
 
-            {/* Headline */}
+            {/* Headline + tip */}
             <div className="rounded-3xl bg-emerald-500/10 border border-emerald-500/30 p-5">
               <p className="text-lg font-semibold text-emerald-400">{outfit.headline}</p>
+              {outfit.tip && (
+                <p className="text-sm text-zinc-300 mt-2">{outfit.tip}</p>
+              )}
               {outfit.notes.map((n, i) => (
                 <p key={i} className="text-sm text-zinc-400 mt-1">⚠️ {n}</p>
               ))}
@@ -219,7 +282,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               ))}
             </div>
 
-            {/* Active customisations summary */}
+            {/* Active customisation pills */}
             {(rideOptions.intensity !== 'moderate' || rideOptions.duration !== 'medium' || rideOptions.timeOfDay !== 'morning') && (
               <div className="flex flex-wrap gap-2">
                 {rideOptions.intensity !== 'moderate' && (
@@ -240,14 +303,19 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               </div>
             )}
 
-            {/* Share */}
+            {/* Feedback confirmation */}
+            {feedbackDone && (
+              <p className="text-sm text-emerald-400 text-center">
+                ✓ Thanks — we'll calibrate your next recommendation
+              </p>
+            )}
+
+            {/* Action buttons */}
             <button
-              onClick={() => handleShare(outfit)}
+              onClick={handleShare}
               className="rounded-2xl bg-zinc-800 py-4 text-white text-sm font-medium hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
             >
-              {copied ? (
-                <>✓ Copied to clipboard</>
-              ) : (
+              {copied ? '✓ Copied to clipboard' : (
                 <>
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -257,33 +325,45 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               )}
             </button>
 
-            {/* Action buttons */}
-            <button
-              onClick={() => setShowCustomise(true)}
-              className="rounded-2xl bg-zinc-800 py-4 text-white text-sm font-medium hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              Customise ride
-            </button>
-
-            <button
-              onClick={load}
-              className="rounded-2xl bg-zinc-900 py-4 text-zinc-500 text-sm font-medium hover:bg-zinc-800 transition-all"
-            >
-              Refresh weather
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowCustomise(true)}
+                className="rounded-2xl bg-zinc-800 py-4 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-all"
+              >
+                ⚙️ Customise
+              </button>
+              {!feedbackDone ? (
+                <button
+                  onClick={() => setShowFeedback(true)}
+                  className="rounded-2xl bg-zinc-800 py-4 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-all"
+                >
+                  🌡️ How was it?
+                </button>
+              ) : (
+                <button
+                  onClick={load}
+                  className="rounded-2xl bg-zinc-800 py-4 text-zinc-400 text-sm font-medium hover:bg-zinc-700 transition-all"
+                >
+                  ↻ Refresh
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>
 
-      {/* Customise panel */}
       {showCustomise && (
         <CustomisePanel
           options={rideOptions}
           onChange={handleRideOptionsChange}
           onClose={() => setShowCustomise(false)}
+        />
+      )}
+
+      {showFeedback && (
+        <FeedbackModal
+          onSelect={handleFeedback}
+          onClose={() => setShowFeedback(false)}
         />
       )}
     </div>

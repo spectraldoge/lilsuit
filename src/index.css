@@ -18,3 +18,19 @@ body {
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Light mode — override Tailwind zinc variables */
+html.light body {
+  background-color: #f8fafc;
+  color: #18181b;
+}
+
+html.light {
+  --color-zinc-950: #f8fafc;
+  --color-zinc-900: #f1f5f9;
+  --color-zinc-800: #e2e8f0;
+  --color-zinc-700: #cbd5e1;
+  --color-zinc-500: #475569;
+  --color-zinc-400: #334155;
+  --color-white: #18181b;
+}

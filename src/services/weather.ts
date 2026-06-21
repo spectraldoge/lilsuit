@@ -34,6 +34,18 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; lo
   return { lat: parseFloat(lat), lon: parseFloat(lon), displayName: display_name }
 }
 
+export async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+    if (!res.ok) return ''
+    const data = await res.json()
+    return data.address?.city || data.address?.town || data.address?.village || data.address?.county || ''
+  } catch {
+    return ''
+  }
+}
+
 export function getCurrentLocation(): Promise<GeolocationCoordinates> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {

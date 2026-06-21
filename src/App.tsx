@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { UserProfile } from './types'
 import { loadProfile } from './store/profileStore'
+import { loadTheme, applyTheme } from './store/themeStore'
 import Onboarding from './components/Onboarding'
 import HomeScreen from './components/HomeScreen'
 import SettingsScreen from './components/SettingsScreen'
@@ -12,6 +13,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
+    applyTheme(loadTheme())
     const saved = loadProfile()
     if (saved) {
       setProfile(saved)
