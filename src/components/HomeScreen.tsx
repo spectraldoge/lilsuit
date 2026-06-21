@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, SavedLocation, Activity } from '../types'
 import { defaultRideOptions } from '../types'
 import { fetchWeatherAt, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
@@ -183,7 +183,14 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     if (weather) setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC, activity), activity))
   }
 
-  useEffect(() => { load() }, [load])
+  // Auto-load only once on mount — not every time `load`'s identity changes
+  // (it changes when activity/options change, which must NOT re-trigger geolocation)
+  const didInit = useRef(false)
+  useEffect(() => {
+    if (didInit.current) return
+    didInit.current = true
+    load()
+  }, [load])
 
   function daysAhead(iso: string): number {
     const ms = new Date(iso).getTime() - Date.now()
