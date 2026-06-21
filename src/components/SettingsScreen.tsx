@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { UserProfile, Gender, CustomKitItem, Units } from '../types'
 import { saveProfile } from '../store/profileStore'
 import { loadLocations, deleteLocation } from '../store/locationStore'
+import { loadHistory, deleteRide } from '../store/rideHistoryStore'
 import { loadTheme, saveTheme, applyTheme, type Theme } from '../store/themeStore'
 
 interface Props {
@@ -50,6 +51,7 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
   const [addingItem, setAddingItem] = useState(false)
   const [newItem, setNewItem] = useState(blankItem())
   const [locations, setLocations] = useState(loadLocations())
+  const [history, setHistory] = useState(loadHistory())
   const [theme, setThemeState] = useState<Theme>(loadTheme())
 
   function set<K extends keyof UserProfile>(key: K, value: UserProfile[K]) {
@@ -71,6 +73,19 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
   function handleDeleteLocation(id: string) {
     deleteLocation(id)
     setLocations(loadLocations())
+  }
+
+  function handleDeleteRide(id: string) {
+    deleteRide(id)
+    setHistory(loadHistory())
+  }
+
+  const feedbackLabel: Record<string, string> = {
+    too_hot: '🥵 Too hot', just_right: '👌 Just right', too_cold: '🥶 Too cold',
+  }
+  const tempUnit = draft.units === 'metric' ? '°C' : '°F'
+  function showTemp(c: number) {
+    return draft.units === 'metric' ? `${c}${tempUnit}` : `${Math.round(c * 9 / 5 + 32)}${tempUnit}`
   }
 
   function handleThemeToggle(t: Theme) {
@@ -227,6 +242,36 @@ export default function SettingsScreen({ profile, onSave, onBack }: Props) {
                     <div className="text-zinc-500 text-xs mt-0.5 truncate max-w-[200px]">{loc.name}</div>
                   </div>
                   <button onClick={() => handleDeleteLocation(loc.id)} className="text-zinc-500 hover:text-red-400 transition-all pl-4">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Ride history */}
+        <section className="flex flex-col gap-3">
+          <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Ride history</label>
+          {history.length === 0 ? (
+            <p className="text-sm text-zinc-500">No rides logged yet. Rate a ride or log a past one to start fine-tuning your recommendations.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {history.map(ride => (
+                <div key={ride.id} className="flex items-center justify-between rounded-2xl bg-zinc-800 px-4 py-3">
+                  <div>
+                    <div className="text-white text-sm font-medium">
+                      {showTemp(ride.tempC)} · {feedbackLabel[ride.feedback]}
+                    </div>
+                    <div className="text-zinc-500 text-xs mt-0.5">
+                      {new Date(ride.date).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                      {ride.source === 'manual' ? ' · logged' : ''}
+                      {ride.wore ? ` · ${ride.wore}` : ''}
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteRide(ride.id)} className="text-zinc-500 hover:text-red-400 transition-all pl-4">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>

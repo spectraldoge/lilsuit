@@ -1,43 +1,72 @@
 import type { RideResult, FeedbackValue } from '../types'
 
 const KEY = 'lilsuit_ride_history'
-const MAX = 20
+const MAX = 50
 
 export function loadHistory(): RideResult[] {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    // migrate older records that used effectiveTempC / had no source
+    return parsed.map((r: any) => ({
+      id: r.id,
+      date: r.date,
+      tempC: r.tempC ?? r.effectiveTempC ?? 0,
+      feedback: r.feedback,
+      wore: r.wore,
+      source: r.source ?? 'in_app',
+    }))
   } catch {
     return []
   }
 }
 
-export function saveRide(effectiveTempC: number, feedback: FeedbackValue): void {
+function persist(history: RideResult[]): void {
+  localStorage.setItem(KEY, JSON.stringify(history.slice(0, MAX)))
+}
+
+export function saveRide(
+  tempC: number,
+  feedback: FeedbackValue,
+  opts: { wore?: string; source?: RideResult['source']; date?: string } = {}
+): void {
   const history = loadHistory()
   const result: RideResult = {
     id: crypto.randomUUID(),
-    date: new Date().toISOString(),
-    effectiveTempC,
+    date: opts.date ?? new Date().toISOString(),
+    tempC: Math.round(tempC),
     feedback,
+    wore: opts.wore?.trim() || undefined,
+    source: opts.source ?? 'in_app',
   }
-  const updated = [result, ...history].slice(0, MAX)
-  localStorage.setItem(KEY, JSON.stringify(updated))
+  persist([result, ...history])
 }
 
-// Returns a bias in °C to add to effective temp based on recent feedback.
+export function deleteRide(id: string): void {
+  persist(loadHistory().filter(r => r.id !== id))
+}
+
+// Net "too hot" minus "too cold" → a °C bias.
 // Positive = user runs hotter than expected → recommend lighter kit.
-// Negative = user runs colder than expected → recommend heavier kit.
-export function getTemperatureBias(): number {
-  const history = loadHistory().slice(0, 10)
-  if (history.length < 3) return 0
-
-  const hot  = history.filter(r => r.feedback === 'too_hot').length
-  const cold = history.filter(r => r.feedback === 'too_cold').length
+function biasFromResults(results: RideResult[]): number {
+  if (results.length < 3) return 0
+  const hot  = results.filter(r => r.feedback === 'too_hot').length
+  const cold = results.filter(r => r.feedback === 'too_cold').length
   const net  = hot - cold
-
   if (net >= 4) return 3
   if (net >= 2) return 1.5
   if (net <= -4) return -3
   if (net <= -2) return -1.5
   return 0
+}
+
+// Temperature-band aware: prefer feedback from rides near `aroundTempC`,
+// fall back to all recent rides if there isn't enough nearby data.
+export function getTemperatureBias(aroundTempC: number): number {
+  const history = loadHistory()
+  const nearby = history.filter(r => Math.abs(r.tempC - aroundTempC) <= 5)
+
+  if (nearby.length >= 3) return biasFromResults(nearby.slice(0, 10))
+  return biasFromResults(history.slice(0, 10))
 }

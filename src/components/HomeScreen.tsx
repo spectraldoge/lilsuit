@@ -7,6 +7,7 @@ import { getTemperatureBias, saveRide } from '../store/rideHistoryStore'
 import { loadLocations, saveLocation } from '../store/locationStore'
 import CustomisePanel from './CustomisePanel'
 import FeedbackModal from './FeedbackModal'
+import LogRideModal from './LogRideModal'
 
 interface Props {
   profile: UserProfile
@@ -26,6 +27,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [rideOptions, setRideOptions] = useState<RideOptions>(defaultRideOptions)
   const [showCustomise, setShowCustomise] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showLogRide, setShowLogRide] = useState(false)
   const [feedbackDone, setFeedbackDone] = useState(false)
   const [copied, setCopied] = useState(false)
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
@@ -35,7 +37,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   useEffect(() => { setSavedLocations(loadLocations()) }, [])
 
   const buildOutfit = useCallback((w: WeatherData, opts: RideOptions) => {
-    setOutfit(getRecommendation(w, profile, opts, getTemperatureBias()))
+    setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC)))
   }, [profile])
 
   const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
@@ -100,14 +102,14 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
       try {
         const w = await fetchWeatherAt(currentCoords.lat, currentCoords.lon, opts.dateTime)
         setWeather(w)
-        setOutfit(getRecommendation(w, profile, opts, getTemperatureBias()))
+        setOutfit(getRecommendation(w, profile, opts, getTemperatureBias(w.feelsLikeC)))
       } catch (e) {
         setError((e as Error).message ?? 'Could not load that forecast')
       } finally {
         setUpdating(false)
       }
     } else if (weather) {
-      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias()))
+      setOutfit(getRecommendation(weather, profile, opts, getTemperatureBias(weather.feelsLikeC)))
     }
   }
 
@@ -132,9 +134,16 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   }
 
   function handleFeedback(f: 'too_hot' | 'just_right' | 'too_cold') {
-    if (outfit) saveRide(outfit.effectiveTempC, f)
+    if (weather) saveRide(weather.feelsLikeC, f, { source: 'in_app' })
     setShowFeedback(false)
     setFeedbackDone(true)
+  }
+
+  function handleLogRide(tempC: number, f: 'too_hot' | 'just_right' | 'too_cold', wore: string) {
+    saveRide(tempC, f, { source: 'manual', wore })
+    setShowLogRide(false)
+    // Re-apply learning to the current recommendation immediately
+    if (weather) setOutfit(getRecommendation(weather, profile, rideOptions, getTemperatureBias(weather.feelsLikeC)))
   }
 
   useEffect(() => { load() }, [load])
@@ -395,6 +404,13 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
                 </button>
               )}
             </div>
+
+            <button
+              onClick={() => setShowLogRide(true)}
+              className="rounded-2xl bg-zinc-900 py-3 text-zinc-500 text-sm font-medium hover:bg-zinc-800 hover:text-zinc-300 transition-all"
+            >
+              + Log a past ride
+            </button>
           </>
         )}
       </div>
@@ -411,6 +427,14 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
         <FeedbackModal
           onSelect={handleFeedback}
           onClose={() => setShowFeedback(false)}
+        />
+      )}
+
+      {showLogRide && (
+        <LogRideModal
+          units={profile.units}
+          onSave={handleLogRide}
+          onClose={() => setShowLogRide(false)}
         />
       )}
     </div>

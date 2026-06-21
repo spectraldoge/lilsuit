@@ -82,7 +82,9 @@ export type FeedbackValue = 'too_hot' | 'just_right' | 'too_cold'
 
 export interface RideResult {
   id: string
-  date: string
-  effectiveTempC: number
+  date: string          // when the ride happened (ISO)
+  tempC: number         // the felt/air temperature of the ride
   feedback: FeedbackValue
+  wore?: string         // optional free-text note of what they wore
+  source: 'in_app' | 'manual'
 }
