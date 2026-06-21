@@ -3,6 +3,7 @@ import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions, Saved
 import { defaultRideOptions } from '../types'
 import { fetchWeatherAt, getCurrentLocation, geocodeAddress, reverseGeocode, isLocationDenied } from '../services/weather'
 import { getRecommendation, buildShareText } from '../services/outfitAdvisor'
+import { getNutrition } from '../services/nutritionAdvisor'
 import { getTemperatureBias, saveRide } from '../store/rideHistoryStore'
 import { loadLocations, saveLocation } from '../store/locationStore'
 import CustomisePanel from './CustomisePanel'
@@ -337,6 +338,32 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
                 </div>
               ))}
             </div>
+
+            {/* Nutrition */}
+            {(() => {
+              const nutrition = getNutrition(weather, rideOptions)
+              return (
+                <div className="rounded-3xl bg-zinc-900 p-5 flex flex-col gap-3">
+                  <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">Fuel & hydration</h3>
+                  <div className="flex items-start gap-4">
+                    <span className="text-2xl w-8 text-center">💧</span>
+                    <p className="text-white text-sm leading-snug">{nutrition.hydration}</p>
+                  </div>
+                  {nutrition.fuel && (
+                    <div className="flex items-start gap-4">
+                      <span className="text-2xl w-8 text-center">🍌</span>
+                      <p className="text-white text-sm leading-snug">{nutrition.fuel}</p>
+                    </div>
+                  )}
+                  {nutrition.notes.map((n, i) => (
+                    <div key={i} className="flex items-start gap-4">
+                      <span className="text-2xl w-8 text-center">🧂</span>
+                      <p className="text-zinc-400 text-sm leading-snug">{n}</p>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
 
             {/* Active customisation pills */}
             {(rideOptions.intensity !== 'moderate' || rideOptions.duration !== 'medium' || rideOptions.timeOfDay !== 'morning') && (
