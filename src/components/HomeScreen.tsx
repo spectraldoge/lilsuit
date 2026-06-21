@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { UserProfile, WeatherData, OutfitRecommendation } from '../types'
+import type { UserProfile, WeatherData, OutfitRecommendation, RideOptions } from '../types'
+import { defaultRideOptions } from '../types'
 import { fetchWeather, getCurrentLocation, geocodeAddress, isLocationDenied } from '../services/weather'
 import { getRecommendation } from '../services/outfitAdvisor'
+import CustomisePanel from './CustomisePanel'
 
 interface Props {
   profile: UserProfile
@@ -17,16 +19,21 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
   const [error, setError] = useState('')
   const [address, setAddress] = useState('')
   const [locationLabel, setLocationLabel] = useState('')
+  const [rideOptions, setRideOptions] = useState<RideOptions>(defaultRideOptions)
+  const [showCustomise, setShowCustomise] = useState(false)
+
+  const buildOutfit = useCallback((w: WeatherData, opts: RideOptions) => {
+    setOutfit(getRecommendation(w, profile, opts))
+  }, [profile])
 
   const loadFromCoords = useCallback(async (lat: number, lon: number, label?: string) => {
     setStatus('fetching')
     const w = await fetchWeather(lat, lon)
-    const o = getRecommendation(w, profile)
     setWeather(w)
-    setOutfit(o)
+    buildOutfit(w, rideOptions)
     if (label) setLocationLabel(label)
     setStatus('done')
-  }, [profile])
+  }, [profile, rideOptions, buildOutfit])
 
   const load = useCallback(async () => {
     setStatus('locating')
@@ -57,7 +64,23 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
     }
   }, [address, loadFromCoords])
 
+  // Re-compute outfit whenever ride options change (no need to re-fetch weather)
+  function handleRideOptionsChange(opts: RideOptions) {
+    setRideOptions(opts)
+    if (weather) buildOutfit(weather, opts)
+  }
+
   useEffect(() => { load() }, [load])
+
+  const isMetric = rideOptions.units === 'metric'
+  function displayTemp(c: number) {
+    if (isMetric) return `${c}°C`
+    return `${Math.round(c * 9 / 5 + 32)}°F`
+  }
+  function displayWind(kph: number) {
+    if (isMetric) return `${kph} km/h`
+    return `${Math.round(kph * 0.621)} mph`
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950 pb-8">
@@ -88,7 +111,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
           </div>
         )}
 
-        {/* Location denied — ask for address */}
+        {/* Location denied */}
         {status === 'needs_address' && (
           <div className="flex flex-col justify-center flex-1 gap-5">
             <div className="text-center">
@@ -125,10 +148,7 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
             <span className="text-4xl">😬</span>
             <p className="text-zinc-400">{error}</p>
-            <button
-              onClick={load}
-              className="rounded-2xl bg-emerald-500 px-6 py-3 text-white font-medium hover:bg-emerald-400 transition-all"
-            >
+            <button onClick={load} className="rounded-2xl bg-emerald-500 px-6 py-3 text-white font-medium hover:bg-emerald-400 transition-all">
               Try again
             </button>
           </div>
@@ -144,16 +164,16 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
             {/* Weather card */}
             <div className="rounded-3xl bg-zinc-900 p-5 flex items-center justify-between">
               <div>
-                <div className="text-5xl font-bold text-white">{weather.tempC}°</div>
+                <div className="text-5xl font-bold text-white">{displayTemp(weather.tempC)}</div>
                 <div className="text-zinc-400 text-sm mt-1">{weather.description}</div>
                 <div className="text-zinc-500 text-xs mt-1">
-                  Feels {weather.feelsLikeC}° · Wind {weather.windKph} km/h
+                  Feels {displayTemp(weather.feelsLikeC)} · Wind {displayWind(weather.windKph)}
                   {weather.isRaining ? ' · 🌧️ Rain' : ''}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-zinc-500 mb-1">effective temp</div>
-                <div className="text-3xl font-semibold text-emerald-400">{outfit.effectiveTempC}°</div>
+                <div className="text-3xl font-semibold text-emerald-400">{displayTemp(outfit.effectiveTempC)}</div>
                 <div className="text-xs text-zinc-500 mt-1">for you</div>
               </div>
             </div>
@@ -180,16 +200,56 @@ export default function HomeScreen({ profile, onOpenSettings }: Props) {
               ))}
             </div>
 
-            {/* Refresh */}
+            {/* Active customisations summary */}
+            {(rideOptions.intensity !== 'moderate' || rideOptions.duration !== 'medium' || rideOptions.timeOfDay !== 'morning') && (
+              <div className="flex flex-wrap gap-2">
+                {rideOptions.intensity !== 'moderate' && (
+                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                    {rideOptions.intensity === 'easy' ? '🐢 Easy' : '🔥 Hard'}
+                  </span>
+                )}
+                {rideOptions.duration !== 'medium' && (
+                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                    {rideOptions.duration === 'short' ? '⚡ Short' : '🌄 Long'}
+                  </span>
+                )}
+                {rideOptions.timeOfDay !== 'morning' && (
+                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                    {rideOptions.timeOfDay === 'midday' ? '☀️ Midday' : '🌇 Afternoon'}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <button
+              onClick={() => setShowCustomise(true)}
+              className="rounded-2xl bg-zinc-800 py-4 text-white text-sm font-medium hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Customise ride
+            </button>
+
             <button
               onClick={load}
-              className="rounded-2xl bg-zinc-800 py-4 text-zinc-400 text-sm font-medium hover:bg-zinc-700 transition-all"
+              className="rounded-2xl bg-zinc-900 py-4 text-zinc-500 text-sm font-medium hover:bg-zinc-800 transition-all"
             >
               Refresh weather
             </button>
           </>
         )}
       </div>
+
+      {/* Customise panel */}
+      {showCustomise && (
+        <CustomisePanel
+          options={rideOptions}
+          onChange={handleRideOptionsChange}
+          onClose={() => setShowCustomise(false)}
+        />
+      )}
     </div>
   )
 }

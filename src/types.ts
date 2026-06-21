@@ -36,6 +36,25 @@ export interface OutfitItem {
   emoji: string
 }
 
+export type Intensity = 'easy' | 'moderate' | 'hard'
+export type Duration = 'short' | 'medium' | 'long'
+export type TimeOfDay = 'morning' | 'midday' | 'afternoon'
+export type Units = 'metric' | 'imperial'
+
+export interface RideOptions {
+  intensity: Intensity
+  duration: Duration
+  timeOfDay: TimeOfDay
+  units: Units
+}
+
+export const defaultRideOptions: RideOptions = {
+  intensity: 'moderate',
+  duration: 'medium',
+  timeOfDay: 'morning',
+  units: 'metric',
+}
+
 export interface OutfitRecommendation {
   items: OutfitItem[]
   headline: string

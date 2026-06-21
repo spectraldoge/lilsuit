@@ -1,4 +1,4 @@
-import type { UserProfile, WeatherData, OutfitRecommendation, OutfitItem } from '../types'
+import type { UserProfile, WeatherData, OutfitRecommendation, OutfitItem, RideOptions } from '../types'
 
 // Heavier riders generate more heat; adjust effective temperature upward
 function weightAdjustment(kg: number): number {
@@ -17,15 +17,39 @@ function personalAdjustment(profile: UserProfile): number {
   return adj
 }
 
+function intensityAdjustment(intensity: RideOptions['intensity']): number {
+  if (intensity === 'easy') return 0
+  if (intensity === 'moderate') return 2
+  return 4 // hard effort generates significant heat
+}
+
+function durationAdjustment(duration: RideOptions['duration']): number {
+  // Long rides: err on the side of warmth since you'll cool at stops
+  if (duration === 'short') return 1
+  if (duration === 'medium') return 0
+  return -1
+}
+
+function timeOfDayAdjustment(timeOfDay: RideOptions['timeOfDay']): number {
+  // Morning is coldest; factor in temp typically being 2-4° lower
+  if (timeOfDay === 'morning') return -2
+  if (timeOfDay === 'midday') return 1
+  return 0
+}
+
 export function getRecommendation(
   weather: WeatherData,
-  profile: UserProfile
+  profile: UserProfile,
+  ride: RideOptions
 ): OutfitRecommendation {
   const baseTemp = weather.feelsLikeC
   const windChill = weather.windKph > 30 ? -2 : weather.windKph > 15 ? -1 : 0
   const effective =
     baseTemp +
-    windChill -
+    windChill +
+    intensityAdjustment(ride.intensity) +
+    durationAdjustment(ride.duration) +
+    timeOfDayAdjustment(ride.timeOfDay) -
     weightAdjustment(profile.weightKg) -
     personalAdjustment(profile)
 
